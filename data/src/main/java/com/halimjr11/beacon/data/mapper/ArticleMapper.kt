@@ -8,11 +8,11 @@ import com.halimjr11.beacon.network.dto.ArticleDto
 private const val REMOVED_TITLE = "[Removed]"
 
 /** Drops articles without url, or with a blank/"[Removed]" title (AC 3.7). */
-fun ArticleDto.toEntity(sourceId: String, queryKey: String): ArticleEntity? {
+fun ArticleDto.toEntity(feedId: String, queryKey: String): ArticleEntity? {
     val url = url?.takeIf { it.isNotBlank() } ?: return null
     val title = title?.takeIf { it.isNotBlank() && it != REMOVED_TITLE } ?: return null
     return ArticleEntity(
-        sourceId = sourceId,
+        feedId = feedId,
         queryKey = queryKey,
         url = url,
         sourceName = source?.name.orEmpty(),

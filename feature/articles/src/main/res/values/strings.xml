@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="articles_search_hint">Search articles</string>
+    <string name="articles_empty">No articles found.</string>
+    <string name="articles_no_match">No articles match \"%1$s\"</string>
+    <string name="articles_back">Back</string>
+</resources>

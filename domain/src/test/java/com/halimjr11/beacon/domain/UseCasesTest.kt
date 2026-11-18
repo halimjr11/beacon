@@ -3,6 +3,7 @@ package com.halimjr11.beacon.domain
 import androidx.paging.PagingData
 import app.cash.turbine.test
 import com.halimjr11.beacon.domain.model.NewsCategory
+import com.halimjr11.beacon.domain.model.NewsFeed
 import com.halimjr11.beacon.domain.repository.NewsRepository
 import com.halimjr11.beacon.domain.usecase.GetArticlesUseCase
 import com.halimjr11.beacon.domain.usecase.GetSourcesUseCase
@@ -32,9 +33,9 @@ class UseCasesTest {
     @Test
     fun `articles forwards arguments and flow`() = runTest {
         val data = PagingData.empty<com.halimjr11.beacon.domain.model.Article>()
-        every { repository.articles("bbc-news", "") } returns flowOf(data)
+        every { repository.articles(NewsFeed.Source("bbc-news"), "") } returns flowOf(data)
 
-        GetArticlesUseCase(repository)("bbc-news", "").test {
+        GetArticlesUseCase(repository)(NewsFeed.Source("bbc-news"), "").test {
             assertEquals(data, awaitItem())
             awaitComplete()
         }

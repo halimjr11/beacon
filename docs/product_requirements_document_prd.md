@@ -6,41 +6,40 @@
 * **Tech Stack:** Kotlin, Jetpack Compose (Material 3), MVVM, Clean Architecture, Coroutines & Flow, Koin 4.2.2, Navigation 3, Paging 3, Room (offline-first, `RemoteMediator`), Retrofit + OkHttp + Gson, Coil 3, Android `WebView`.
 * **Target Platform:** Android (Min SDK 24 / Android 7.0, Target SDK 37).
 * **Data Source:** [NewsAPI](https://newsapi.org) v2 (`/v2/top-headlines/sources`, `/v2/top-headlines`).
-* **Objective:** Aplikasi native untuk menjelajahi berita lewat alur **Kategori → Sumber Berita → Artikel → Detail Artikel (web view)**, dilengkapi pencarian sumber dan artikel, *endless scrolling*, serta penanganan kasus positif dan negatif yang menyeluruh.
+* **Objective:** Aplikasi native untuk menjelajahi berita lewat tiga tab (**Home** berisi highlight, **Genres**, **Sources**) yang bermuara ke **Daftar Artikel → Detail Artikel (web view)**, dilengkapi pencarian sumber dan artikel, *endless scrolling*, serta penanganan kasus positif dan negatif yang menyeluruh.
 
 ### 1.1 Asumsi & Keputusan
 | # | Keputusan | Alasan |
 |---|---|---|
 | A1 | Daftar sumber difilter `language=en` secara default (konstanta, mudah diubah). | Tanpa filter, hasil mencampur belasan bahasa. |
-| A2 | Artikel diambil dari `top-headlines` dengan `sources=<id>`, bukan `everything`. | Sesuai alur "berita utama per sumber"; `q` tetap bisa dipakai untuk pencarian. |
+| A2 | Artikel diambil dari `top-headlines` (parameter `sources=<id>` untuk sumber, `category=<x>` untuk genre, `country=us` untuk Home), bukan `everything`. | Sesuai alur "berita utama per sumber"; `q` tetap bisa dipakai untuk pencarian. |
 | A3 | Detail artikel memakai `WebView` (bukan Custom Tabs). | Sesuai user story 4. |
 | A4 | Pencarian artikel memanggil API (`q`) dengan debounce; pencarian sumber memfilter di sisi klien. | API sources tidak punya parameter pencarian. |
 | A5 | **Offline-first:** Room adalah sumber kebenaran untuk sumber dan artikel; jaringan hanya mengisi Room lewat `RemoteMediator` (ADR-013). | Kuota 100 request/hari dan kebutuhan membaca daftar saat offline. |
+| A7 | Home memakai satu feed `top-headlines?country=us`: 5 item teratas menjadi carousel highlight, sisanya daftar "Latest". Genre dan sumber memakai feed sendiri; semua feed memakai mekanisme cache yang sama (ADR-015). | Satu endpoint untuk Home hemat kuota; `sources` tidak boleh digabung `country`/`category`. |
 | A6 | TTL cache: sumber **24 jam**, artikel **1 jam**; retensi artikel 7 hari. | Artikel NewsAPI Developer tertunda 24 jam, jadi TTL pendek tidak memberi data lebih baru. |
 
 ### 1.2 Di Luar Cakupan (Out of Scope)
-Bookmark/favorit, sinkronisasi latar belakang (WorkManager), pull-to-refresh manual, notifikasi, login, berbagi artikel, Custom Tabs, endpoint `/v2/everything`, mode gelap khusus per layar, Compose UI test dan instrumented test (**segera ditambahkan** setelah fitur stabil).
+Bookmark/favorit, sinkronisasi latar belakang (WorkManager), notifikasi, login, berbagi artikel, Custom Tabs, endpoint `/v2/everything`, mode gelap khusus per layar, Compose UI test dan instrumented test (**segera ditambahkan** setelah fitur stabil).
 
 ---
 
 ## 2. User Flow & Navigation Map
 ```text
-[CategoriesScreen] (Start Destination, statis)
-       │
-       ├── Tap kategori (category)
+Bottom navigation (Home | Genres | Sources); Back dari tab mana pun kembali ke Home
+
+[HomeScreen] ── carousel highlight + daftar "Latest" (pull-to-refresh)
+       │  tap artikel
        ▼
-[SourcesScreen] (Search field + daftar sumber, endless scroll)
-       │
-       ├── Tap sumber (sourceId, sourceName)
-       ▼
-[ArticlesScreen] (Search field + daftar artikel, endless scroll)
-       │
-       ├── Tap artikel (url, title)
-       ▼
-[ArticleWebScreen] (WebView + progress + error/retry)
-       │
-       └── Tap "Open in browser" ──► Browser eksternal (fallback)
+[GenresScreen] ── tap genre ──► [ArticlesScreen (genre)] ──┐
+                                                          │ tap artikel (url, title)
+[SourcesScreen] ── chip kategori + search ── tap sumber ──► [ArticlesScreen (sumber)] ──┤
+                                                          ▼
+                                                [ArticleWebScreen] (WebView + progress + error/retry)
+                                                          │
+                                                          └── "Open in browser" ──► Browser eksternal
 ```
+Bottom bar hanya tampil di tiga tab; layar artikel dan detail menyembunyikannya.
 
 ---
 
@@ -48,33 +47,33 @@ Bookmark/favorit, sinkronisasi latar belakang (WorkManager), pull-to-refresh man
 
 | # | User story | Dicakup oleh |
 |---|---|---|
-| US1 | Menampilkan daftar kategori berita. | FR-01 |
+| US1 | Menampilkan genre berita di menu terpisah. | FR-01 |
 | US2 | Menampilkan sumber berita saat kategori dipilih. | FR-02 |
 | US3 | Menampilkan artikel saat sumber dipilih. | FR-03 |
 | US4 | Menampilkan detail artikel di web view. | FR-04 |
 | US5 | Pencarian sumber dan artikel. | FR-05 |
 | US6 | *Endless scrolling* di sumber dan artikel. | FR-02, FR-03, FR-06 |
+| US8 | Home menampilkan highlight dan headline terbaru. | FR-09 |
 | US7 | Kasus positif dan negatif tercakup. | Semua FR, FR-07, [Test Plan](test_plan_and_qa.md) |
 
 ---
 
 ## 4. Functional Requirements & Acceptance Criteria (AC)
 
-### FR-01: Daftar Kategori (US1)
-* **Deskripsi:** Layar awal menampilkan tujuh kategori resmi NewsAPI: `business`, `entertainment`, `general`, `health`, `science`, `sports`, `technology`.
+### FR-01: Genres (US1)
+* **Deskripsi:** Tab **Genres** menampilkan tujuh kategori resmi NewsAPI: `business`, `entertainment`, `general`, `health`, `science`, `sports`, `technology`.
 * **UI/UX Behavior:**
-  * `TopAppBar` berjudul **"Beacon"**.
-  * Daftar/grid kartu Material 3 dengan nama kategori (mis. *Business*, *Technology*). Urutan tetap seperti di atas.
-  * Kategori bersifat **statis** (bukan hasil API), jadi tidak ada loading maupun error.
+  * `TopAppBar` berjudul **"Genres"**; grid 2 kolom kartu dengan ikon dan nama. Urutan tetap seperti di atas.
+  * Genre bersifat **statis** (bukan hasil API), jadi tidak ada loading maupun error.
+  * Tap genre membuka `ArticlesScreen` berisi headline genre itu (`top-headlines?category=…`), dengan pencarian dan *endless scrolling* (FR-03, FR-05).
 * **Acceptance Criteria:**
-  * **AC 1.1 (Positive):** Tujuh kategori tampil, dapat diklik, dan membuka `SourcesScreen` untuk kategori itu.
+  * **AC 1.1 (Positive):** Tujuh genre tampil, dapat diklik, dan membuka daftar artikel genre itu dengan judul nama genre.
   * **AC 1.2 (Offline-safe):** Layar tetap tampil penuh walau perangkat offline.
 
 ### FR-02: Sumber Berita per Kategori (US2, US6)
 * **Deskripsi:** Menampilkan sumber berita untuk kategori terpilih (`/v2/top-headlines/sources?category=…&language=en`).
 * **UI/UX Behavior:**
-  * `TopAppBar` menampilkan nama kategori dan tombol *Back*.
-  * Di bawahnya ada *search field* (FR-05).
+  * Tab **Sources**: `TopAppBar` "Sources", *search field* (FR-05), lalu baris **chip kategori** (default General) yang memilih kategori sumber.
   * Setiap item: **nama sumber**, **deskripsi** (maks. 2 baris), dan label **bahasa/negara**.
   * Endpoint sources **tidak punya paginasi**, sehingga daftar diambil sekali per kategori, disimpan di Room (TTL 24 jam), lalu ditampilkan **20 item per halaman** secara bertahap dari Room (*endless scrolling* sisi klien).
 * **Acceptance Criteria:**
@@ -88,7 +87,7 @@ Bookmark/favorit, sinkronisasi latar belakang (WorkManager), pull-to-refresh man
   * **AC 2.8 (Cache):** Kembali ke layar yang sama, memutar layar, atau membuka ulang aplikasi dalam TTL tidak memanggil API lagi (data dari Room).
 
 ### FR-03: Artikel per Sumber (US3, US6)
-* **Deskripsi:** Menampilkan artikel sumber terpilih (`/v2/top-headlines?sources=<id>&page=&pageSize=20`).
+* **Deskripsi:** Menampilkan artikel satu **sumber** (`/v2/top-headlines?sources=<id>&page=&pageSize=20`) atau satu **genre** (`?category=<x>&…`). Kedua daftar memakai layar yang sama.
 * **UI/UX Behavior:**
   * `TopAppBar` menampilkan nama sumber dan tombol *Back*; di bawahnya *search field* (FR-05).
   * Kartu artikel: **gambar** (`urlToImage`, placeholder bila kosong), **judul** (maks. 3 baris), **nama sumber**, **tanggal terbit** (`dd MMM yyyy`), dan **deskripsi** (maks. 2 baris).
@@ -167,6 +166,19 @@ Bookmark/favorit, sinkronisasi latar belakang (WorkManager), pull-to-refresh man
   * **AC 8.6 (Urutan & Kunci):** Urutan artikel sama dengan urutan API; kunci item daftar stabil walau `url` sama muncul di halaman berbeda (AC 6.3).
   * **AC 8.7 (Retensi):** Artikel lebih tua dari 7 hari dan baris di atas batas total dibersihkan; pembersihan tidak mengganggu daftar yang sedang tampil.
   * **AC 8.8 (Gambar & WebView):** Gambar yang pernah dimuat tersedia offline (disk cache Coil). Membuka artikel saat offline tetap menampilkan error + Retry + Open in browser (AC 4.2).
+
+### FR-09: Home & Highlight (US8)
+* **Deskripsi:** Tab **Home** (start destination) menampilkan headline terbaru dari satu feed `top-headlines?country=us`.
+* **UI/UX Behavior:**
+  * `TopAppBar` **"Beacon"**; bagian **Highlights**: carousel horizontal 5 headline teratas (gambar penuh, judul 3 baris di atas scrim, nama sumber) dengan indikator halaman.
+  * Bagian **Latest**: kartu artikel (FR-03) untuk item berikutnya, *endless scrolling*.
+  * Tap carousel atau kartu membuka `ArticleWebScreen` langsung.
+  * Tarik ke bawah (*pull-to-refresh*) menyegarkan feed (tindakan pengguna, menghabiskan kuota).
+* **Acceptance Criteria:**
+  * **AC 9.1 (Positive):** Carousel dan daftar tampil; urutan sama dengan API.
+  * **AC 9.2 (Offline-first):** Cache masih segar (< 1 jam) tidak memanggil API; offline dengan cache menampilkan data + banner (AC 8.2); tanpa cache tampil error + Retry.
+  * **AC 9.3 (Dedup):** Item yang sudah ada di carousel tidak muncul lagi di "Latest".
+  * **AC 9.4 (Few items):** Kurang dari 5 headline tetap tampil tanpa crash; bagian "Latest" disembunyikan.
 
 ---
 

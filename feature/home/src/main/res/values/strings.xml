@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_title">Beacon</string>
+    <string name="home_empty">No headlines found.</string>
+    <string name="home_highlights">Highlights</string>
+    <string name="home_latest">Latest</string>
+</resources>

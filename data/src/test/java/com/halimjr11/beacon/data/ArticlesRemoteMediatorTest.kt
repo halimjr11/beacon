@@ -8,8 +8,10 @@ import com.halimjr11.beacon.common.NewsException
 import com.halimjr11.beacon.data.cache.CacheConfig
 import com.halimjr11.beacon.data.mediator.ArticlesRemoteMediator
 import com.halimjr11.beacon.data.mapper.toEntity
+import com.halimjr11.beacon.domain.model.NewsCategory
 import com.halimjr11.beacon.database.entity.RemoteKeyEntity
 import com.halimjr11.beacon.network.dto.ArticleDto
+import com.halimjr11.beacon.domain.model.NewsFeed
 import com.halimjr11.beacon.network.NewsApiService
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -32,10 +34,10 @@ class ArticlesRemoteMediatorTest {
     private val keyDao = FakeRemoteKeyDao()
     private val tx = FakeTransaction()
     private val clock = FakeClock()
-    private val key = "articles:bbc-news:"
+    private val key = "articles:source:bbc-news:"
 
     private fun mediator(query: String = "") =
-        ArticlesRemoteMediator("bbc-news", query, api, articleDao, keyDao, tx, clock)
+        ArticlesRemoteMediator(NewsFeed.Source("bbc-news"), query, api, articleDao, keyDao, tx, clock)
 
     private fun success(r: RemoteMediator.MediatorResult) =
         (r as RemoteMediator.MediatorResult.Success).endOfPaginationReached
@@ -53,7 +55,7 @@ class ArticlesRemoteMediatorTest {
     @Test
     fun `refresh loads page 1, replaces old rows and stores nextPage`() = runTest {
         articleDao.insertAll(listOf(articleDto(99).toEntityForTest()))
-        coEvery { api.getTopHeadlines("bbc-news", null, 1, 20) } returns articlesResponse(20, total = 45)
+        coEvery { api.getTopHeadlines("bbc-news", null, null, null, 1, 20) } returns articlesResponse(20, total = 45)
 
         val result = mediator().load(LoadType.REFRESH, emptyState())
 
@@ -66,7 +68,7 @@ class ArticlesRemoteMediatorTest {
     @Test
     fun `append uses nextPage and keeps refresh time`() = runTest {
         keyDao.upsert(RemoteKeyEntity(key, 2, fetchedAt = 123L))
-        coEvery { api.getTopHeadlines("bbc-news", null, 2, 20) } returns articlesResponse(20, total = 45, from = 21)
+        coEvery { api.getTopHeadlines("bbc-news", null, null, null, 2, 20) } returns articlesResponse(20, total = 45, from = 21)
 
         val result = mediator().load(LoadType.APPEND, emptyState())
 
@@ -78,7 +80,7 @@ class ArticlesRemoteMediatorTest {
     @Test
     fun `last page ends paging`() = runTest {
         keyDao.upsert(RemoteKeyEntity(key, 3, 1L))
-        coEvery { api.getTopHeadlines(any(), any(), 3, any()) } returns articlesResponse(5, total = 45, from = 41)
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), 3, any()) } returns articlesResponse(5, total = 45, from = 41)
 
         assertEquals(true, success(mediator().load(LoadType.APPEND, emptyState())))
         assertEquals(null, keyDao.keys.getValue(key).nextPage)
@@ -86,7 +88,7 @@ class ArticlesRemoteMediatorTest {
 
     @Test
     fun `empty page ends paging`() = runTest {
-        coEvery { api.getTopHeadlines(any(), any(), any(), any()) } returns articlesResponse(0, total = 100)
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), any(), any()) } returns articlesResponse(0, total = 100)
         assertEquals(true, success(mediator().load(LoadType.REFRESH, emptyState())))
     }
 
@@ -95,16 +97,30 @@ class ArticlesRemoteMediatorTest {
         keyDao.upsert(RemoteKeyEntity(key, null, 1L))
         assertEquals(true, success(mediator().load(LoadType.APPEND, emptyState())))
         assertEquals(true, success(mediator().load(LoadType.PREPEND, emptyState())))
-        coVerify(exactly = 0) { api.getTopHeadlines(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { api.getTopHeadlines(any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `category feed sends only category, headlines feed sends country`() = runTest {
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), any(), any()) } returns articlesResponse(1, total = 1)
+
+        ArticlesRemoteMediator(NewsFeed.Category(NewsCategory.Technology), "", api, articleDao, keyDao, tx, clock)
+            .load(LoadType.REFRESH, emptyState())
+        ArticlesRemoteMediator(NewsFeed.Headlines, "", api, articleDao, keyDao, tx, clock)
+            .load(LoadType.REFRESH, emptyState())
+
+        coVerify { api.getTopHeadlines(null, "technology", null, null, 1, 20) }
+        coVerify { api.getTopHeadlines(null, null, "us", null, 1, 20) }
+        assertEquals(setOf("articles:category:technology:", "articles:top:"), keyDao.keys.keys)
     }
 
     @Test
     fun `search query is sent as q and stored under its own key`() = runTest {
-        coEvery { api.getTopHeadlines("bbc-news", "election", 1, 20) } returns articlesResponse(3, total = 3)
+        coEvery { api.getTopHeadlines("bbc-news", null, null, "election", 1, 20) } returns articlesResponse(3, total = 3)
 
         mediator("election").load(LoadType.REFRESH, emptyState())
 
-        assertEquals(setOf("articles:bbc-news:election"), keyDao.keys.keys)
+        assertEquals(setOf("articles:source:bbc-news:election"), keyDao.keys.keys)
         assertEquals("election", articleDao.rows.first().queryKey)
     }
 
@@ -113,7 +129,7 @@ class ArticlesRemoteMediatorTest {
         val response = articlesResponse(2, total = 100).copy(
             articles = listOf(articleDto(1), articleDto(2, title = "[Removed]"), articleDto(3, url = null)),
         )
-        coEvery { api.getTopHeadlines(any(), any(), any(), any()) } returns response
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), any(), any()) } returns response
 
         val result = mediator().load(LoadType.REFRESH, emptyState())
 
@@ -125,7 +141,7 @@ class ArticlesRemoteMediatorTest {
     fun `duplicate url in later page is ignored`() = runTest {
         keyDao.upsert(RemoteKeyEntity(key, 2, 1L))
         articleDao.insertAll(listOf(articleDto(1).toEntityForTest()))
-        coEvery { api.getTopHeadlines(any(), any(), 2, any()) } returns articlesResponse(2, total = 100, from = 1)
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), 2, any()) } returns articlesResponse(2, total = 100, from = 1)
 
         mediator().load(LoadType.APPEND, emptyState())
 
@@ -136,7 +152,7 @@ class ArticlesRemoteMediatorTest {
     fun `network failure keeps rows and key`() = runTest {
         articleDao.insertAll(listOf(articleDto(1).toEntityForTest()))
         keyDao.upsert(RemoteKeyEntity(key, 2, 1L))
-        coEvery { api.getTopHeadlines(any(), any(), any(), any()) } throws IOException()
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), any(), any()) } throws IOException()
 
         val result = mediator().load(LoadType.APPEND, emptyState())
 
@@ -149,7 +165,7 @@ class ArticlesRemoteMediatorTest {
     @Test
     fun `rate limit surfaces as RateLimited`() = runTest {
         val body = """{"status":"error","code":"rateLimited","message":"m"}""".toResponseBody("application/json".toMediaType())
-        coEvery { api.getTopHeadlines(any(), any(), any(), any()) } throws HttpException(Response.error<Any>(429, body))
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), any(), any()) } throws HttpException(Response.error<Any>(429, body))
 
         val result = mediator().load(LoadType.REFRESH, emptyState())
 
@@ -161,7 +177,7 @@ class ArticlesRemoteMediatorTest {
     fun `max results on append is the end of the list, not an error`() = runTest {
         keyDao.upsert(RemoteKeyEntity(key, 6, 1L))
         val body = """{"status":"error","code":"maximumResultsReached","message":"m"}""".toResponseBody("application/json".toMediaType())
-        coEvery { api.getTopHeadlines(any(), any(), 6, any()) } throws HttpException(Response.error<Any>(426, body))
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), 6, any()) } throws HttpException(Response.error<Any>(426, body))
 
         assertEquals(true, success(mediator().load(LoadType.APPEND, emptyState())))
         assertEquals(null, keyDao.keys.getValue(key).nextPage)
@@ -169,11 +185,11 @@ class ArticlesRemoteMediatorTest {
 
     @Test
     fun `cancellation is rethrown`() = runTest {
-        coEvery { api.getTopHeadlines(any(), any(), any(), any()) } throws CancellationException("left screen")
+        coEvery { api.getTopHeadlines(any(), any(), any(), any(), any(), any()) } throws CancellationException("left screen")
         var thrown = false
         try { mediator().load(LoadType.REFRESH, emptyState()) } catch (e: CancellationException) { thrown = true }
         assertEquals(true, thrown)
     }
 
-    private fun ArticleDto.toEntityForTest() = toEntity("bbc-news", "")!!
+    private fun ArticleDto.toEntityForTest() = toEntity("source:bbc-news", "")!!
 }

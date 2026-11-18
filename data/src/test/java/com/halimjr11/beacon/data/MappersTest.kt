@@ -34,7 +34,7 @@ class MappersTest {
     @Test
     fun `article maps fields and null becomes empty`() {
         val entity = ArticleDto(title = "T", url = "https://a").toEntity("bbc", "q")!!
-        assertEquals("bbc", entity.sourceId)
+        assertEquals("bbc", entity.feedId)
         assertEquals("q", entity.queryKey)
         assertEquals("", entity.author)
         assertEquals("", entity.imageUrl)
@@ -53,7 +53,7 @@ class MappersTest {
     @Test
     fun `article domain uses url as id and formats the date`() {
         val domain = ArticleEntity(
-            rowId = 5, sourceId = "s", queryKey = "", url = "https://a", sourceName = "BBC", author = "",
+            rowId = 5, feedId = "s", queryKey = "", url = "https://a", sourceName = "BBC", author = "",
             title = "T", description = "", imageUrl = "", publishedAt = "2026-07-24T10:15:30Z", content = "",
         ).toDomain()
         assertEquals("https://a", domain.id)

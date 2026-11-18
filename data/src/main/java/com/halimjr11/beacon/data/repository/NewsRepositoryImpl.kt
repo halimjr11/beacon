@@ -8,6 +8,7 @@ import androidx.paging.map
 import com.halimjr11.beacon.data.cache.CacheConfig
 import com.halimjr11.beacon.data.cache.Clock
 import com.halimjr11.beacon.data.cache.TransactionRunner
+import com.halimjr11.beacon.data.cache.feedId
 import com.halimjr11.beacon.data.cache.likePattern
 import com.halimjr11.beacon.data.cache.queryKey
 import com.halimjr11.beacon.data.mapper.toDomain
@@ -18,6 +19,7 @@ import com.halimjr11.beacon.database.dao.RemoteKeyDao
 import com.halimjr11.beacon.database.dao.SourceDao
 import com.halimjr11.beacon.domain.model.Article
 import com.halimjr11.beacon.domain.model.NewsCategory
+import com.halimjr11.beacon.domain.model.NewsFeed
 import com.halimjr11.beacon.domain.model.NewsSource
 import com.halimjr11.beacon.domain.repository.NewsRepository
 import com.halimjr11.beacon.network.NewsApiService
@@ -43,12 +45,12 @@ class NewsRepositoryImpl(
         pagingSourceFactory = { sourceDao.pagingSource(category.apiValue, likePattern(query)) },
     ).flow.map { page -> page.map { it.toDomain() } }
 
-    override fun articles(sourceId: String, query: String): Flow<PagingData<Article>> {
+    override fun articles(feed: NewsFeed, query: String): Flow<PagingData<Article>> {
         val key = queryKey(query)
         return Pager(
             config = config,
-            remoteMediator = ArticlesRemoteMediator(sourceId, key, api, articleDao, keyDao, transaction, clock),
-            pagingSourceFactory = { articleDao.pagingSource(sourceId, key) },
+            remoteMediator = ArticlesRemoteMediator(feed, key, api, articleDao, keyDao, transaction, clock),
+            pagingSourceFactory = { articleDao.pagingSource(feed.feedId(), key) },
         ).flow.map { page -> page.map { it.toDomain() } }
     }
 }

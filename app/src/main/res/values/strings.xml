@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">Beacon</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_genres">Genres</string>
+    <string name="nav_sources">Sources</string>
 </resources>

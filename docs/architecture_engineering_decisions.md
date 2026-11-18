@@ -17,9 +17,10 @@ Beacon/
 ├── domain/                         # Android library tanpa UI (logika murni): Models, NewsRepository, UseCases, domainModule
 ├── data/                           # Android Library: NewsRepositoryImpl, Mappers (DTO→Entity→Domain), SourcesRemoteMediator, ArticlesRemoteMediator, dataModule
 └── feature/
-    ├── categories/                 # CategoriesScreen (statis)
-    ├── sources/                    # SourcesScreen, SourcesViewModel (+search), sourcesModule
-    ├── articles/                   # ArticlesScreen, ArticlesViewModel (+search, debounce), articlesModule
+    ├── home/                       # HomeScreen (carousel highlight + Latest), HomeViewModel, homeModule
+    ├── categories/                 # GenresScreen (7 genre, statis)
+    ├── sources/                    # SourcesScreen (chip kategori + search lokal), SourcesViewModel, sourcesModule
+    ├── articles/                   # ArticlesScreen untuk feed genre atau sumber, ArticlesViewModel (+search, debounce), articlesModule
     └── articleweb/                 # ArticleWebScreen (WebView), WebUrlPolicy (fungsi murni: validasi, upgrade https, izin skema), ArticleWebViewModel (opsional)
 ```
 
@@ -43,7 +44,8 @@ graph TD
     end
 
     subgraph FeatureLayer ["Feature Modules (MVVM)"]
-        F_CAT[":feature:categories"]
+        F_HOME[":feature:home<br/>carousel + Latest"]
+        F_CAT[":feature:categories<br/>Genres"]
         F_SRC[":feature:sources<br/>search (client)"]
         F_ART[":feature:articles<br/>search (API q)"]
         F_WEB[":feature:articleweb<br/>WebView"]
@@ -81,13 +83,16 @@ graph TD
     end
 
     APP --> NAV
+    NAV --> F_HOME
     NAV --> F_CAT
     NAV --> F_SRC
     NAV --> F_ART
     NAV --> F_WEB
+    F_HOME --> UC
     F_SRC --> UC
     F_ART --> UC
     F_CAT --> MODELS
+    F_HOME --> C_UI
     F_SRC --> C_UI
     F_ART --> C_UI
     F_WEB --> C_UI
@@ -109,11 +114,15 @@ graph TD
 
 ```mermaid
 graph LR
-    C["CategoriesKey<br/>(start)"] -->|kategori| S["SourcesKey(category)"]
-    S -->|sumber| A["ArticlesKey(sourceId, sourceName)"]
-    A -->|artikel| W["ArticleWebKey(url, title)"]
+    H["HomeKey (start)"] -->|artikel| W["ArticleWebKey(url, title)"]
+    G["GenresKey"] -->|genre| CA["CategoryArticlesKey(category)"]
+    S["SourcesKey"] -->|sumber| SA["SourceArticlesKey(sourceId, sourceName)"]
+    CA -->|artikel| W
+    SA -->|artikel| W
 ```
-Key `@Serializable` berada di `:app`; layar fitur menerima *callback* navigasi (tidak bergantung pada library navigasi).
+* Tiga tab (`HomeKey`, `GenresKey`, `SourcesKey`) memakai `NavigationBar`. Memilih tab mengganti back stack menjadi `[Home, tab]`, sehingga Back dari tab mana pun kembali ke Home lalu keluar. State tab tidak dipertahankan saat berpindah tab (data tetap ada karena dibaca dari Room).
+* `NavDisplay` memakai dekorator `rememberSaveableStateHolderNavEntryDecorator` dan `rememberViewModelStoreNavEntryDecorator` supaya ViewModel terikat ke entri back stack.
+* Key `@Serializable` (`NavKey`) berada di `:app`; layar fitur menerima *callback* navigasi (tidak bergantung pada library navigasi). Bottom bar disembunyikan di layar artikel dan detail.
 
 ---
 
@@ -133,9 +142,15 @@ data class Article(val id: String = "", val sourceName: String = "", val author:
                    val title: String = "", val description: String = "", val url: String = "",
                    val imageUrl: String = "", val publishedAt: String = "", val content: String = "")
 
+sealed interface NewsFeed {
+    data object Headlines : NewsFeed                       // Home: top-headlines?country=us
+    data class Category(val category: NewsCategory) : NewsFeed   // ?category=<x>
+    data class Source(val id: String) : NewsFeed                 // ?sources=<id>
+}
+
 interface NewsRepository {
     fun sources(category: NewsCategory, query: String): Flow<PagingData<NewsSource>>
-    fun articles(sourceId: String, query: String): Flow<PagingData<Article>>
+    fun articles(feed: NewsFeed, query: String): Flow<PagingData<Article>>
 }
 ```
 Semua properti non-null dengan default; model berada satu file per class. Use case, satu file masing-masing: `GetSourcesUseCase`, `GetArticlesUseCase`. Kategori statis dibaca langsung dari `NewsCategory.entries` (tanpa use case, karena tidak ada logika).
@@ -172,18 +187,19 @@ data class SourceEntity(@PrimaryKey val id: String, val name: String, val descri
                         val category: String, val language: String, val country: String)
 
 @Entity(tableName = "articles",
-        indices = [Index(value = ["sourceId", "queryKey", "url"], unique = true)])
+        indices = [Index(value = ["feedId", "queryKey", "url"], unique = true)])
 data class ArticleEntity(@PrimaryKey(autoGenerate = true) val rowId: Long = 0,
-                         val sourceId: String, val queryKey: String, val url: String,
+                         val feedId: String, val queryKey: String, val url: String,
                          val sourceName: String, val author: String, val title: String,
                          val description: String, val imageUrl: String,
                          val publishedAt: String, val content: String)
 
 @Entity(tableName = "remote_keys")
-data class RemoteKeyEntity(@PrimaryKey val key: String,   // "sources:<category>:<lang>" atau "articles:<sourceId>:<queryKey>"
+data class RemoteKeyEntity(@PrimaryKey val key: String,   // "sources:<category>:<lang>" atau "articles:<feedId>:<queryKey>"
                            val nextPage: Int?, val fetchedAt: Long)
 ```
 * `ORDER BY rowId` menjaga urutan API; `rowId` dipakai sebagai kunci item Compose (menyelesaikan duplikat `url` antar halaman, AC 6.3).
+* `feedId`: `top` (Home), `category:<x>`, atau `source:<id>`.
 * `queryKey` = query yang sudah di-`trim` dan di-*lowercase*; `""` untuk daftar default.
 * DAO mengembalikan `PagingSource<Int, Entity>`; pencarian sumber memakai `WHERE category = :c AND (name LIKE :q OR description LIKE :q)`.
 * `fetchedAt` memakai jam yang dapat disuntik (`Clock`/lambda) agar TTL bisa diuji.
@@ -404,7 +420,7 @@ sequenceDiagram
   * **Room adalah sumber kebenaran.** UI hanya mengamati `PagingSource` Room; Retrofit hanya menulis ke Room lewat `RemoteMediator`. Domain tetap `Flow<PagingData<T>>` sehingga `:domain` dan `:feature:*` tidak berubah.
   * **Modul `:core:database`** (Room 3 `androidx.room3`: `room3-runtime`, `room3-paging`, KSP; plugin `beacon.android.room`). Hanya `:data` yang bergantung padanya; mapper DTO → Entity → Domain berada di `:data`.
   * **`SourcesRemoteMediator`:** `initialize()` mengembalikan `SKIP_INITIAL_REFRESH` bila `remote_keys.fetchedAt` kurang dari **24 jam**. `REFRESH` mengambil seluruh daftar kategori dalam satu panggilan, mengganti baris kategori itu dalam satu transaksi, dan mengakhiri paging (`endOfPaginationReached = true`). Paginasi 20 item dan pencarian (`LIKE`) dilakukan Room, tanpa panggilan API.
-  * **`ArticlesRemoteMediator`:** kunci per `(sourceId, queryKey)`; TTL **1 jam** (artikel memang tertunda 24 jam, jadi TTL pendek tidak memberi data lebih baru). `REFRESH` halaman 1 menghapus baris `(sourceId, queryKey)` lama; `APPEND` membaca `nextPage` dari `remote_keys`; `PREPEND` langsung berakhir. Hapus-dan-insert serta update key selalu dalam satu `withTransaction`.
+  * **`ArticlesRemoteMediator`:** kunci per `(feedId, queryKey)`; TTL **1 jam** (artikel memang tertunda 24 jam, jadi TTL pendek tidak memberi data lebih baru). `REFRESH` halaman 1 menghapus baris `(sourceId, queryKey)` lama; `APPEND` membaca `nextPage` dari `remote_keys`; `PREPEND` langsung berakhir. Hapus-dan-insert serta update key selalu dalam satu `withTransaction`.
   * **Aturan error:** kegagalan tidak menghapus data lokal. Layar error penuh hanya bila `itemCount == 0`; selain itu banner "Offline, menampilkan data tersimpan" (refresh) atau footer Retry (append). `rateLimited`/`apiKeyExhausted`: tanpa *auto-retry*, tetap tampilkan cache dengan banner kuota.
   * **Pencarian artikel** tetap memanggil API (`q`) lewat `queryKey` sendiri; hasilnya ikut di-cache. Offline tanpa cache untuk query itu menampilkan error (TC-34).
   * **Retensi:** hapus artikel lebih tua dari 7 hari dan batasi total baris; skema cache boleh memakai `fallbackToDestructiveMigration` karena data dapat diambil ulang (`exportSchema = true`).
@@ -420,6 +436,11 @@ sequenceDiagram
   * **Plugin konvensi:** `beacon.android.library` (SDK, Java 17, JUnit 5, bundle unit-test) → `beacon.android.library.compose` (+ Compose BOM/bundle) → `beacon.android.feature` (+ `:core:common`, `:core:ui`, `:domain`, Koin, lifecycle, paging-testing); `beacon.android.room` (KSP + plugin Room 3 + skema); `beacon.android.application` (+ plugin serialization).
   * **Penegak batas modul:** `beacon.android.feature` menggagalkan build bila fitur bergantung pada `:data`, `:core:network`, atau `:core:database`. Build file tiap fitur hanya `plugins { id("beacon.android.feature") }`.
 * **Consequences:** (+) versi dan aturan di satu tempat, modul baru cukup satu baris plugin, matriks dependensi ditegakkan build. (−) ada satu included build tambahan; plugin yang dipasang lewat `build-logic` harus diterapkan dari script konvensi (bukan `plugins {}` modul), karena classpath-nya tidak terlihat oleh modul.
+
+### ADR-015: Feed Artikel Tunggal untuk Home, Genre, dan Sumber
+* **Context:** Home (highlight), tab Genres, dan tab Sources semuanya berujung pada daftar artikel `top-headlines`, hanya parameternya berbeda. NewsAPI melarang `sources` digabung `country`/`category`.
+* **Decision:** `NewsFeed` (domain) = `Headlines | Category | Source`. `:data` memetakannya ke `feedId` (kunci Room dan remote key) dan parameter (`FeedParams`). Satu `ArticlesRemoteMediator` dan satu `ArticlesScreen` melayani ketiganya; Home membagi satu `PagingData` menjadi carousel (5 pertama) dan daftar sisanya.
+* **Consequences:** (+) tanpa duplikasi mediator, TTL, retensi, dan tes. (−) `:feature:home` dan `:feature:articles` sama-sama bergantung pada `GetArticlesUseCase`; Home memakai `country=us` tetap (konstanta `CacheConfig.HEADLINES_COUNTRY`).
 
 ---
 

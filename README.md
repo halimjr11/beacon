@@ -3,7 +3,7 @@
 # 🔦 Beacon
 
 **Aplikasi berita Android native berbasis NewsAPI**
-Kategori → Sumber → Artikel → Detail (web view)
+Home (highlight) · Genres · Sources → Artikel → Detail (web view)
 
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4.x-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
@@ -19,8 +19,9 @@ Kategori → Sumber → Artikel → Detail (web view)
 
 | | Fitur | Detail |
 |---|---|---|
-| 🗂️ | **Kategori** | Tujuh kategori resmi NewsAPI (statis) |
-| 📰 | **Sumber berita** | Daftar sumber per kategori, endless scrolling dari Room (diisi sekali per kategori, TTL 24 jam) |
+| 🏠 | **Home** | Carousel highlight + daftar headline terbaru, pull-to-refresh |
+| 🗂️ | **Genres** | Tujuh genre resmi NewsAPI (statis), tap untuk headline genre |
+| 📰 | **Sources** | Tab terpisah: chip kategori + pencarian, daftar sumber per kategori, endless scrolling dari Room (diisi sekali per kategori, TTL 24 jam) |
 | 🧾 | **Artikel** | Artikel per sumber, endless scrolling (Paging 3 + `RemoteMediator`, TTL 1 jam) |
 | 📴 | **Offline-first** | Room sebagai sumber kebenaran; daftar tetap tampil saat offline dengan banner, hemat kuota API |
 | 🌐 | **Detail artikel** | Dibuka di `WebView` dengan progress, error, dan fallback browser |
@@ -31,7 +32,10 @@ Kategori → Sumber → Artikel → Detail (web view)
 
 ```mermaid
 graph LR
-    C[Categories] --> S[Sources + search] --> A[Articles + search] --> W[Article WebView]
+    H[Home] --> W[Article WebView]
+    G[Genres] --> A[Articles + search]
+    S[Sources + search] --> A
+    A --> W
 ```
 
 ## 🏗 Arsitektur
@@ -47,7 +51,7 @@ Multi-module Clean Architecture + MVVM (UDF), offline-first: **Room** menyimpan 
 | `:core:ui` | Tema, komponen bersama, `SearchField` |
 | `:domain` | Model, `NewsRepository`, use case, `domainModule` |
 | `:data` | Repository, mapper, `SourcesRemoteMediator`, `ArticlesRemoteMediator` |
-| `:feature:categories` `sources` `articles` `articleweb` | Layar dan ViewModel |
+| `:feature:home` `categories` (Genres) `sources` `articles` `articleweb` | Layar dan ViewModel |
 
 Namespace: `com.halimjr11.beacon`.
 
@@ -84,6 +88,7 @@ Namespace: `com.halimjr11.beacon`.
 - [x] Offline-first fase 1: Room + mediator sumber
 - [x] Offline-first fase 2 (data): mediator artikel, retensi (`CacheRetention`)
 - [ ] Offline-first fase 2 (UI): banner offline di layar, panggil `CacheRetention.purge()` saat start
-- [ ] Layar kategori, sumber, artikel, dan web view
+- [x] Layar Home, Genres, Sources, artikel, dan web view (belum dicoba di perangkat)
+- [ ] Verifikasi di emulator dengan `NEWS_API_KEY` asli
 - [ ] Unit test dan QA manual
 - [ ] Compose UI test dan instrumented test (menyusul)

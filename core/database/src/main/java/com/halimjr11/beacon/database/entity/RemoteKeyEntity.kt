@@ -4,7 +4,7 @@ import androidx.room3.Entity
 import androidx.room3.PrimaryKey
 
 /**
- * [key] is `sources:<category>:<language>` or `articles:<sourceId>:<queryKey>`.
+ * [key] is `sources:<category>:<language>` or `articles:<feedId>:<queryKey>`.
  * [nextPage] is null at the end of the list; [fetchedAt] is epoch millis (TTL).
  */
 @Entity(tableName = "remote_keys")

@@ -10,27 +10,27 @@ Dokumen ini memetakan setiap user story ke kasus uji **positif** dan **negatif**
 
 Prasyarat umum: emulator/perangkat Android 7.0+, `NEWS_API_KEY` valid di `local.properties` kecuali dinyatakan lain, internet aktif kecuali dinyatakan lain.
 
-**Respons tiruan (mock):** kasus bertanda 🧩 (TC-10, 11, 15, 16, 17, 18, 44, 50) tidak bisa dipicu dengan API asli. Jalankan MockWebServer/server tiruan di host dan set `NEWS_API_BASE_URL=http://10.0.2.2:<port>/v2/` di `local.properties` (hanya build debug; emulator mengakses host lewat `10.0.2.2`; cleartext ke host ini diizinkan hanya oleh network security config debug). Skrip respons per kasus disimpan di `docs/mock/` saat implementasi.
+**Respons tiruan (mock):** kasus bertanda 🧩 (TC-10, 11, 15, 16, 17, 18, 44, 50, 60) tidak bisa dipicu dengan API asli. Jalankan MockWebServer/server tiruan di host dan set `NEWS_API_BASE_URL=http://10.0.2.2:<port>/v2/` di `local.properties` (hanya build debug; emulator mengakses host lewat `10.0.2.2`; cleartext ke host ini diizinkan hanya oleh network security config debug). Skrip respons per kasus disimpan di `docs/mock/` saat implementasi.
 
-### US1 — Kategori
+### US1 — Genres
 
 | ID | Tipe | Langkah | Hasil yang diharapkan | Status |
 |---|---|---|---|---|
-| TC-01 | Positif | Buka aplikasi | Tujuh kategori tampil: Business, Entertainment, General, Health, Science, Sports, Technology | ⏳ |
-| TC-02 | Positif | Tap "Technology" | `SourcesScreen` terbuka dengan judul Technology | ⏳ |
-| TC-03 | Negatif | Aktifkan mode pesawat (dengan atau tanpa cache), buka aplikasi | Daftar kategori tetap tampil penuh (statis) | ⏳ |
+| TC-01 | Positif | Buka tab Genres | Tujuh genre tampil: Business, Entertainment, General, Health, Science, Sports, Technology | ⏳ |
+| TC-02 | Positif | Tap "Technology" | `ArticlesScreen` terbuka berjudul Technology berisi headline genre itu | ⏳ |
+| TC-03 | Negatif | Aktifkan mode pesawat (dengan atau tanpa cache), buka tab Genres | Tujuh genre tetap tampil penuh (statis) | ⏳ |
 
 ### US2 — Sumber per Kategori
 
 | ID | Tipe | Langkah | Hasil yang diharapkan | Status |
 |---|---|---|---|---|
-| TC-04 | Positif | Tap kategori | Loading lalu daftar sumber (nama, deskripsi, label bahasa/negara) | ⏳ |
-| TC-05 | Positif | Kembali lalu masuk kategori yang sama | Daftar tampil dari Room tanpa panggilan API baru (TTL sumber 24 jam) | ⏳ |
+| TC-04 | Positif | Buka tab Sources (chip General aktif) | Loading lalu daftar sumber (nama, deskripsi, label bahasa/negara) | ⏳ |
+| TC-05 | Positif | Pindah ke tab lain lalu kembali ke tab Sources dengan chip yang sama | Daftar tampil dari Room tanpa panggilan API baru (TTL sumber 24 jam) | ⏳ |
 | TC-06 | Positif | Putar layar | Daftar dan posisi scroll bertahan, tanpa panggilan API baru | ⏳ |
-| TC-07 | Negatif | Mode pesawat, tap kategori yang belum pernah dimuat (tanpa cache) | Layar error "No internet connection…" + Retry | ⏳ |
+| TC-07 | Negatif | Mode pesawat, pilih chip kategori yang belum pernah dimuat (tanpa cache) | Layar error "No internet connection…" + Retry | ⏳ |
 | TC-08 | Negatif | Dari TC-07 matikan mode pesawat, tap Retry | Daftar sumber termuat | ⏳ |
-| TC-09 | Negatif | `NEWS_API_KEY` kosong/salah, tap kategori | Pesan "API key is missing or invalid", tanpa Retry | ⏳ |
-| TC-10 🧩 | Negatif | Kuota habis (`rateLimited`/`apiKeyExhausted`) | Pesan "Daily request limit reached…", tanpa Retry | ⏳ |
+| TC-09 | Negatif | `NEWS_API_KEY` kosong/salah, buka tab Sources | Pesan "API key is missing or invalid", tanpa Retry | ⏳ |
+| TC-10 🧩 | Negatif | Kuota habis, tanpa cache, (`rateLimited`/`apiKeyExhausted`) | Pesan "Daily request limit reached…", tanpa Retry | ⏳ |
 | TC-11 🧩 | Negatif | Kategori tanpa sumber (respons mock) | "No sources found." | ⏳ |
 
 ### US3 — Artikel per Sumber
@@ -38,7 +38,7 @@ Prasyarat umum: emulator/perangkat Android 7.0+, `NEWS_API_KEY` valid di `local.
 | ID | Tipe | Langkah | Hasil yang diharapkan | Status |
 |---|---|---|---|---|
 | TC-12 | Positif | Tap sumber | Loading lalu kartu artikel (gambar, judul, sumber, tanggal, deskripsi) | ⏳ |
-| TC-13 | Positif | Tap artikel | `ArticleWebScreen` terbuka | ⏳ |
+| TC-13 | Positif | Tap artikel | `ArticleWebScreen` terbuka langsung (tanpa layar ringkasan) | ⏳ |
 | TC-14 | Negatif | Mode pesawat, tap sumber yang belum pernah dimuat (tanpa cache) | Layar error + Retry | ⏳ |
 | TC-15 🧩 | Negatif | Sumber tidak ada lagi (`sourceDoesNotExist`) | "This source is no longer available." | ⏳ |
 | TC-16 🧩 | Negatif | Sumber tanpa artikel | "No articles found." | ⏳ |
@@ -81,6 +81,20 @@ Prasyarat umum: emulator/perangkat Android 7.0+, `NEWS_API_KEY` valid di `local.
 | TC-38 | Negatif | Dari TC-37 nyalakan internet, tap Retry | Halaman berikutnya masuk | ⏳ |
 | TC-39 | Edge | Artikel: scroll sampai habis | Paging berhenti tanpa error (akhir daftar / batas hasil) | ⏳ |
 
+### US9 — Home & Navigasi (FR-09)
+
+| ID | Tipe | Langkah | Hasil yang diharapkan | Status |
+|---|---|---|---|---|
+| TC-52 | Positif | Buka aplikasi | Home tampil: carousel 5 headline dengan indikator, lalu bagian Latest | ⏳ |
+| TC-53 | Positif | Geser carousel, tap salah satu | Indikator mengikuti; `ArticleWebScreen` terbuka untuk artikel itu | ⏳ |
+| TC-54 | Edge | Bandingkan carousel dengan Latest | Tidak ada artikel ganda (AC 9.3) | ⏳ |
+| TC-55 | Positif | Scroll Home sampai akhir bagian Latest | Halaman berikutnya dimuat otomatis; footer loading/Retry sesuai AC 6.2 | ⏳ |
+| TC-56 | Positif | Tarik ke bawah di Home | Indikator refresh; data diperbarui; posisi tidak rusak | ⏳ |
+| TC-57 | Positif | Online buka Home, mode pesawat, tutup lalu buka aplikasi | Home tampil dari cache + banner offline (AC 8.2) | ⏳ |
+| TC-58 | Navigasi | Dari Genres atau Sources tekan Back | Kembali ke Home; Back sekali lagi keluar aplikasi | ⏳ |
+| TC-59 | Navigasi | Buka layar artikel atau detail | Bottom bar tersembunyi; muncul lagi saat kembali ke tab | ⏳ |
+| TC-60 🧩 | Edge | Home dengan respons mock 3 headline | Carousel 3 item, bagian Latest tidak tampil, tanpa crash (AC 9.4) | ⏳ |
+
 ### US7 — Lintas Fitur
 
 | ID | Tipe | Langkah | Hasil yang diharapkan | Status |
@@ -119,16 +133,17 @@ Format: JUnit 5, `@ParameterizedTest` dengan `argumentSet` (nama deskriptif), Tu
 | `:domain` | `GetSourcesUseCaseTest`, `GetArticlesUseCaseTest` | Argumen diteruskan; flow diteruskan (Turbine) |
 | `:data` | `MappersTest` | Sumber/artikel: field null, id kosong dibuang, `[Removed]`, tanpa `url`, tanggal |
 | `:data` | `SourcesRemoteMediatorTest` | `initialize()` SKIP bila < 24 jam, LAUNCH bila lebih; REFRESH mengganti baris kategori dalam satu transaksi dan `endOfPaginationReached`; gagal tidak menghapus data; kategori berbeda terpisah |
-| `:data` | `ArticlesRemoteMediatorTest` | TTL 1 jam; REFRESH hapus `(sourceId, queryKey)`; APPEND memakai `nextPage`; PREPEND berakhir; `totalResults`, halaman kosong, batas hasil; `IOException`, JSON rusak, cancellation; `queryKey` pencarian terpisah |
+| `:data` | `ArticlesRemoteMediatorTest` | Feed Home/genre/sumber → parameter dan kunci yang benar; TTL 1 jam; REFRESH hapus `(sourceId, queryKey)`; APPEND memakai `nextPage`; PREPEND berakhir; `totalResults`, halaman kosong, batas hasil; `IOException`, JSON rusak, cancellation; `queryKey` pencarian terpisah |
 | `:data` | `CacheRetentionTest` | Artikel > 7 hari dan kelebihan baris dibuang; `remote_keys` tidak yatim |
 | `:core:database` (androidTest, JUnit 4) | `ArticleDaoTest`, `SourceDaoTest` | Urutan `rowId`, `LIKE` tidak peka huruf besar-kecil, indeks unik `(sourceId, queryKey, url)`, hapus per kunci |
 | `:data` | `NewsRepositoryImplTest` | Sukses; error HTTP per kode; offline; JSON rusak; cancellation di-*rethrow* |
-| `:feature:sources` | `SourcesViewModelTest` | Query berubah menghasilkan flow baru; query dipertahankan |
-| `:feature:articles` | `ArticlesViewModelTest` | Debounce 500 ms; < 2 karakter; `flatMapLatest` membatalkan; retry |
+| `:feature:sources` | `SourcesViewModelTest` | Default General; query di-`trim` dan teks field dipertahankan; ganti chip meminta daftar baru |
+| `:feature:home` | `HomeViewModelTest` *(menyusul)* | Meminta feed `Headlines` |
+| `:feature:articles` | `ArticlesViewModelTest` | Daftar awal langsung; debounce 500 ms; < 2 karakter kembali ke default; hanya query terakhir diminta |
 | `:core:common` | `NewsExceptionTest` | `toNewsError()`: `NewsException` → tipe asli; exception lain → `Unknown` |
 | `:feature:articleweb` | `WebUrlPolicyTest` | `url` kosong/tidak valid/`file://`/`intent://` ditolak (AC 4.3, 4.5); `http://` di-upgrade ke `https://` (AC 4.4); `https://` tetap |
 | `:feature:articles` | `ArticlesViewModelTest` (tambahan) | Query turun dari ≥ 2 ke < 2 karakter kembali ke daftar default (AC 5.8) |
-| `:app` | `KoinModulesTest` | Graf DI lengkap |
+| `:app` | `KoinModulesTest` | Graf DI lengkap (`verify`) |
 
 Compose UI test dan instrumented test (JUnit 4) ditambahkan setelah fitur stabil.
 
@@ -143,7 +158,7 @@ Compose UI test dan instrumented test (JUnit 4) ditambahkan setelah fitur stabil
 ### Ringkasan (diisi setelah eksekusi)
 | | Jumlah |
 |---|---|
-| Test case manual | 51 |
+| Test case manual | 60 |
 | Dijalankan / lulus | – |
 | Unit test | – |
 | Defect terbuka | – |

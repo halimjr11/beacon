@@ -62,7 +62,9 @@
 
   | Parameter | Tipe | Wajib | Keterangan |
   |---|---|---|---|
-  | `sources` | String | **Ya (Beacon)** | Satu id sumber (mis. `bbc-news`). Dokumentasi: daftar dipisah koma; **tidak boleh** digabung `country`/`category`. |
+  | `sources` | String | Salah satu dari tiga | Satu id sumber (mis. `bbc-news`) untuk feed sumber. Dokumentasi: **tidak boleh** digabung `country`/`category`. |
+  | `category` | String | Salah satu dari tiga | Genre, untuk feed genre (tab Genres). |
+  | `country` | String | Salah satu dari tiga | Beacon: `us`, untuk feed Home. |
   | `q` | String | Tidak | Kata kunci atau frasa pencarian. Boleh digabung dengan `sources`. |
   | `pageSize` | Int | Tidak | Default 20, maksimum 100. Beacon: `20`. |
   | `page` | Int | Tidak | Nomor halaman, mulai dari `1`. |
@@ -151,8 +153,11 @@ interface NewsApiService {
 
     @GET("top-headlines")
     suspend fun getTopHeadlines(
-        @Query("sources") sourceId: String,
-        @Query("q") query: String?,      // null: Retrofit menghilangkan parameter
+        // Kirim satu kelompok saja: sources ATAU category ATAU country. null: parameter dihilangkan.
+        @Query("sources") sources: String?,
+        @Query("category") category: String?,
+        @Query("country") country: String?,
+        @Query("q") query: String?,
         @Query("page") page: Int,
         @Query("pageSize") pageSize: Int
     ): ArticlesResponseDto

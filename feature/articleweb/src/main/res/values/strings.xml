@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="web_back">Back</string>
+    <string name="web_open_in_browser">Open in browser</string>
+    <string name="web_invalid_url">This article cannot be opened.</string>
+    <string name="web_load_error">The page could not be loaded.</string>
+    <string name="web_retry">Retry</string>
+</resources>

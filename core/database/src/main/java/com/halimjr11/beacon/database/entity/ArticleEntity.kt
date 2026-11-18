@@ -4,14 +4,14 @@ import androidx.room3.Entity
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
 
-/** `rowId` keeps API order and is the stable Compose item key (urls can repeat across pages). */
+/** [feedId] identifies the list (`top`, `category:<x>`, `source:<id>`). `rowId` keeps API order and is the stable Compose item key (urls can repeat across pages). */
 @Entity(
     tableName = "articles",
-    indices = [Index(value = ["sourceId", "queryKey", "url"], unique = true)],
+    indices = [Index(value = ["feedId", "queryKey", "url"], unique = true)],
 )
 data class ArticleEntity(
     @PrimaryKey(autoGenerate = true) val rowId: Long = 0,
-    val sourceId: String,
+    val feedId: String,
     val queryKey: String,
     val url: String,
     val sourceName: String,

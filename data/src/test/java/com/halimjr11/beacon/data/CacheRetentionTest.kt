@@ -27,7 +27,7 @@ class CacheRetentionTest {
         retention.purge()
 
         assertEquals(setOf("articles:new:"), keyDao.keys.keys)
-        assertEquals(listOf("new"), articleDao.rows.map { it.sourceId })
+        assertEquals(listOf("new"), articleDao.rows.map { it.feedId })
     }
 
     @Test

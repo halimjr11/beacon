@@ -10,18 +10,18 @@ import com.halimjr11.beacon.database.entity.ArticleEntity
 @Dao
 interface ArticleDao {
 
-    @Query("SELECT * FROM articles WHERE sourceId = :sourceId AND queryKey = :queryKey ORDER BY rowId")
-    fun pagingSource(sourceId: String, queryKey: String): PagingSource<Int, ArticleEntity>
+    @Query("SELECT * FROM articles WHERE feedId = :feedId AND queryKey = :queryKey ORDER BY rowId")
+    fun pagingSource(feedId: String, queryKey: String): PagingSource<Int, ArticleEntity>
 
-    /** Duplicates of `(sourceId, queryKey, url)` are skipped by the unique index. */
+    /** Duplicates of `(feedId, queryKey, url)` are skipped by the unique index. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(items: List<ArticleEntity>)
 
-    @Query("DELETE FROM articles WHERE sourceId = :sourceId AND queryKey = :queryKey")
-    suspend fun deleteByKey(sourceId: String, queryKey: String)
+    @Query("DELETE FROM articles WHERE feedId = :feedId AND queryKey = :queryKey")
+    suspend fun deleteByKey(feedId: String, queryKey: String)
 
     /** Retention: drop articles whose remote key was already purged. */
-    @Query("DELETE FROM articles WHERE 'articles:' || sourceId || ':' || queryKey NOT IN (SELECT `key` FROM remote_keys)")
+    @Query("DELETE FROM articles WHERE 'articles:' || feedId || ':' || queryKey NOT IN (SELECT `key` FROM remote_keys)")
     suspend fun deleteOrphans()
 
     /** Retention: keep only the newest [max] rows. */

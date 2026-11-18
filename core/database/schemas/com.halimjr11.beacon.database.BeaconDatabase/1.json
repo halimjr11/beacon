@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "48b1064e5c01f20d89699b3f6223c434",
+    "identityHash": "51414c51f6626d4d8739abc81eab6201",
     "entities": [
       {
         "tableName": "sources",
@@ -54,7 +54,7 @@
       },
       {
         "tableName": "articles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` TEXT NOT NULL, `queryKey` TEXT NOT NULL, `url` TEXT NOT NULL, `sourceName` TEXT NOT NULL, `author` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `imageUrl` TEXT NOT NULL, `publishedAt` TEXT NOT NULL, `content` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `feedId` TEXT NOT NULL, `queryKey` TEXT NOT NULL, `url` TEXT NOT NULL, `sourceName` TEXT NOT NULL, `author` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `imageUrl` TEXT NOT NULL, `publishedAt` TEXT NOT NULL, `content` TEXT NOT NULL)",
         "fields": [
           {
             "fieldPath": "rowId",
@@ -63,8 +63,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "sourceId",
-            "columnName": "sourceId",
+            "fieldPath": "feedId",
+            "columnName": "feedId",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -131,15 +131,15 @@
         },
         "indices": [
           {
-            "name": "index_articles_sourceId_queryKey_url",
+            "name": "index_articles_feedId_queryKey_url",
             "unique": true,
             "columnNames": [
-              "sourceId",
+              "feedId",
               "queryKey",
               "url"
             ],
             "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_sourceId_queryKey_url` ON `${TABLE_NAME}` (`sourceId`, `queryKey`, `url`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_feedId_queryKey_url` ON `${TABLE_NAME}` (`feedId`, `queryKey`, `url`)"
           }
         ]
       },
@@ -175,7 +175,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '48b1064e5c01f20d89699b3f6223c434')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '51414c51f6626d4d8739abc81eab6201')"
     ]
   }
 }

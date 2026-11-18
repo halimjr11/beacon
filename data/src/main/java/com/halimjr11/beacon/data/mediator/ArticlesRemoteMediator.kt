@@ -11,21 +11,24 @@ import com.halimjr11.beacon.data.cache.CacheConfig
 import com.halimjr11.beacon.data.cache.Clock
 import com.halimjr11.beacon.data.cache.TransactionRunner
 import com.halimjr11.beacon.data.cache.articlesKey
+import com.halimjr11.beacon.data.cache.feedId
+import com.halimjr11.beacon.data.cache.toParams
 import com.halimjr11.beacon.data.mapper.toEntity
 import com.halimjr11.beacon.database.dao.ArticleDao
 import com.halimjr11.beacon.database.dao.RemoteKeyDao
 import com.halimjr11.beacon.database.entity.ArticleEntity
 import com.halimjr11.beacon.database.entity.RemoteKeyEntity
+import com.halimjr11.beacon.domain.model.NewsFeed
 import com.halimjr11.beacon.network.NewsApiService
 import com.halimjr11.beacon.network.safeApiCall
 
 /**
- * Pages `top-headlines` into Room per `(sourceId, queryKey)`. [queryKey] is already
+ * Pages `top-headlines` into Room per `(feed, queryKey)`. [queryKey] is already
  * trimmed and lower-cased; "" means the default list (no `q`).
  */
 @OptIn(ExperimentalPagingApi::class)
 class ArticlesRemoteMediator(
-    private val sourceId: String,
+    private val feed: NewsFeed,
     private val queryKey: String,
     private val api: NewsApiService,
     private val articleDao: ArticleDao,
@@ -34,7 +37,9 @@ class ArticlesRemoteMediator(
     private val clock: Clock,
 ) : RemoteMediator<Int, ArticleEntity>() {
 
-    private val key = articlesKey(sourceId, queryKey)
+    private val feedId = feed.feedId()
+    private val params = feed.toParams()
+    private val key = articlesKey(feedId, queryKey)
 
     override suspend fun initialize(): InitializeAction {
         val saved = keyDao.get(key)
@@ -55,7 +60,10 @@ class ArticlesRemoteMediator(
         val fetchedAt = if (loadType == LoadType.REFRESH) clock.now() else saved?.fetchedAt ?: clock.now()
 
         val result = safeApiCall {
-            api.getTopHeadlines(sourceId, queryKey.ifEmpty { null }, page, CacheConfig.PAGE_SIZE)
+            api.getTopHeadlines(
+                params.sources, params.category, params.country,
+                queryKey.ifEmpty { null }, page, CacheConfig.PAGE_SIZE,
+            )
         }
         return when (result) {
             is NetworkResult.Error -> when {
@@ -69,11 +77,11 @@ class ArticlesRemoteMediator(
             is NetworkResult.Success -> {
                 val dto = result.data
                 val raw = dto.articles.orEmpty()
-                val items = raw.mapNotNull { it.toEntity(sourceId, queryKey) }
+                val items = raw.mapNotNull { it.toEntity(feedId, queryKey) }
                 val total = dto.totalResults ?: Int.MAX_VALUE
                 val nextPage = if (raw.isEmpty() || page * CacheConfig.PAGE_SIZE >= total) null else page + 1
                 transaction.run {
-                    if (loadType == LoadType.REFRESH) articleDao.deleteByKey(sourceId, queryKey)
+                    if (loadType == LoadType.REFRESH) articleDao.deleteByKey(feedId, queryKey)
                     articleDao.insertAll(items)
                     keyDao.upsert(RemoteKeyEntity(key, nextPage, fetchedAt))
                 }

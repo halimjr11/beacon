@@ -41,20 +41,20 @@ class FakeArticleDao : ArticleDao {
     val rows = mutableListOf<ArticleEntity>()
     var keysProvider: () -> Set<String> = { emptySet() }
     private var nextId = 1L
-    override fun pagingSource(sourceId: String, queryKey: String): PagingSource<Int, ArticleEntity> =
+    override fun pagingSource(feedId: String, queryKey: String): PagingSource<Int, ArticleEntity> =
         error("not used in unit tests")
     override suspend fun insertAll(items: List<ArticleEntity>) {
         items.forEach { item ->
-            val dup = rows.any { it.sourceId == item.sourceId && it.queryKey == item.queryKey && it.url == item.url }
+            val dup = rows.any { it.feedId == item.feedId && it.queryKey == item.queryKey && it.url == item.url }
             if (!dup) rows += item.copy(rowId = nextId++)
         }
     }
-    override suspend fun deleteByKey(sourceId: String, queryKey: String) {
-        rows.removeAll { it.sourceId == sourceId && it.queryKey == queryKey }
+    override suspend fun deleteByKey(feedId: String, queryKey: String) {
+        rows.removeAll { it.feedId == feedId && it.queryKey == queryKey }
     }
     override suspend fun deleteOrphans() {
         val keys = keysProvider()
-        rows.removeAll { "articles:${it.sourceId}:${it.queryKey}" !in keys }
+        rows.removeAll { "articles:${it.feedId}:${it.queryKey}" !in keys }
     }
     override suspend fun trimTo(max: Int) {
         val keep = rows.sortedByDescending { it.rowId }.take(max).toSet()
