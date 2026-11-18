@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -25,6 +26,7 @@ dependencyResolutionManagement {
 rootProject.name = "Beacon"
 include(":app")
 include(":core:common")
+include(":core:database")
 include(":core:network")
 include(":core:ui")
 include(":domain")

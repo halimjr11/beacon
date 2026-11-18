@@ -1,19 +1,9 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
+    id("beacon.android.application")
 }
 
 android {
-    namespace = "com.halimjr11.beacon"
-    compileSdk {
-        version = release(37)
-    }
-
     defaultConfig {
-        applicationId = "com.halimjr11.beacon"
-        minSdk = 24
-        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
     }
@@ -28,22 +18,12 @@ android {
             )
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    buildFeatures {
-        compose = true
-    }
-}
-
-kotlin {
-    jvmToolchain(17)
 }
 
 dependencies {
     api(project(":core:common"))
     implementation(project(":core:network"))
+    implementation(project(":core:database"))
     implementation(project(":core:ui"))
     implementation(project(":domain"))
     implementation(project(":data"))
@@ -55,12 +35,9 @@ dependencies {
     api(libs.bundles.koin.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.bundles.compose)
     implementation(libs.bundles.navigation3)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
-    testImplementation(libs.bundles.unit.test)
     testImplementation(libs.koin.test)
 }

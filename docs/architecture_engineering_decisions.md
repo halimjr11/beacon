@@ -2,7 +2,7 @@
 
 ## 1. Multi-Module Architecture & Dependency Rules
 
-Aplikasi **Beacon** (`com.halimjr11.beacon`) menerapkan **Multi-Module Clean Architecture + MVVM** dengan *Unidirectional Data Flow (UDF)*. Struktur dan aturannya diturunkan dari pengalaman membangun **Katha** (aplikasi film TMDB), dengan penyesuaian untuk sifat NewsAPI (sources tanpa paginasi, kuota 100 request/hari, detail lewat `WebView`).
+Aplikasi **Beacon** (`com.halimjr11.beacon`) menerapkan **Multi-Module Clean Architecture + MVVM** dengan *Unidirectional Data Flow (UDF)*. Struktur dan aturannya disesuaikan dengan sifat NewsAPI (sources tanpa paginasi, kuota 100 request/hari, detail lewat `WebView`) dan pendekatan **offline-first**: Room adalah sumber kebenaran tunggal untuk daftar, Retrofit hanya mengisi Room lewat `RemoteMediator` (ADR-013).
 
 ### A. Struktur Direktori Multi-Module
 
@@ -11,10 +11,11 @@ Beacon/
 ├── app/                            # Application shell, MainActivity, AppNavGraph (Navigation 3), startKoin { ... }
 ├── core/
 │   ├── common/                     # Android library tanpa UI: NetworkResult<T> + NewsError, DispatcherProvider, formatter tanggal
+│   ├── database/                   # Android Library (Room): BeaconDatabase, entity, DAO (PagingSource), RemoteKeys, databaseModule
 │   ├── network/                    # Android Library: OkHttp, ApiKeyInterceptor, Retrofit, NewsApiService, DTO, parser error, networkModule
 │   └── ui/                         # Android Compose: BeaconTheme, FullScreenLoading, FullScreenError, PagingFooter, RemoteImage, SearchField
 ├── domain/                         # Android library tanpa UI (logika murni): Models, NewsRepository, UseCases, domainModule
-├── data/                           # Android Library: NewsRepositoryImpl, Mappers, SourcesCache, PagingSources, dataModule
+├── data/                           # Android Library: NewsRepositoryImpl, Mappers (DTO→Entity→Domain), SourcesRemoteMediator, ArticlesRemoteMediator, dataModule
 └── feature/
     ├── categories/                 # CategoriesScreen (statis)
     ├── sources/                    # SourcesScreen, SourcesViewModel (+search), sourcesModule
@@ -27,7 +28,8 @@ Namespace Gradle: `com.halimjr11.beacon` (app) dan `com.halimjr11.beacon.<modul>
 ### B. Strict Dependency Matrix
 * `:app` → mengoordinasikan seluruh modul untuk merakit navigasi dan mendaftarkan seluruh Koin modules.
 * `:feature:*` → **hanya** `:domain`, `:core:ui`, `:core:common`. **Dilarang** mengakses `:data` atau `:core:network`.
-* `:data` → `:domain`, `:core:network`, `:core:common`.
+* `:data` → `:domain`, `:core:network`, `:core:database`, `:core:common`. Hanya `:data` yang boleh menyentuh Room dan Retrofit.
+* `:core:database` → tidak bergantung ke modul lain (entity dan DAO murni; mapper ke domain berada di `:data`).
 * `:domain` → `:core:common` (yang meng-expose `kotlinx-coroutines-core` dan bundle Koin lewat `api`) dan `androidx.paging:paging-common`. Tanpa Retrofit/OkHttp dan tanpa class Android.
 * `:core:network` → `:core:common`.
 
@@ -57,19 +59,18 @@ graph TD
 
     subgraph DataLayer [":data"]
         REPO_IMPL[NewsRepositoryImpl]
-        CACHE[(SourcesCache<br/>in-memory)]
-        P_SRC[SourcesPagingSource<br/>slice 20/halaman]
-        P_ART[ArticlesPagingSource<br/>page + pageSize]
-        MAPPER[DTO to Domain Mappers]
+        MED_SRC[SourcesRemoteMediator<br/>TTL 24 jam]
+        MED_ART[ArticlesRemoteMediator<br/>page + pageSize, TTL 1 jam]
+        MAPPER[Mappers<br/>DTO to Entity to Domain]
         REPO_IMPL -.->|Implements| REPO_INT
-        REPO_IMPL --> P_SRC
-        REPO_IMPL --> P_ART
-        P_SRC --> CACHE
+        REPO_IMPL --> MED_SRC
+        REPO_IMPL --> MED_ART
         REPO_IMPL --> MAPPER
     end
 
     subgraph CoreLayer ["Core Modules"]
         C_NET[":core:network<br/>Retrofit, ApiKeyInterceptor, error parser"]
+        C_DB[(":core:database<br/>Room: sources, articles, remote_keys")]
         C_UI[":core:ui"]
         C_COM[":core:common<br/>NetworkResult, NewsError"]
     end
@@ -90,8 +91,11 @@ graph TD
     F_SRC --> C_UI
     F_ART --> C_UI
     F_WEB --> C_UI
-    CACHE --> C_NET
-    P_ART --> C_NET
+    MED_SRC --> C_NET
+    MED_ART --> C_NET
+    MED_SRC --> C_DB
+    MED_ART --> C_DB
+    REPO_IMPL -->|"PagingSource (sumber kebenaran)"| C_DB
     C_NET -->|HTTPS + X-Api-Key| NEWS
     F_WEB -.->|HTTPS| WEB
 ```
@@ -157,14 +161,37 @@ class NewsException(val error: NewsError) : Exception()   // :core:common
 fun Throwable.toNewsError(): NewsError =                   // :core:common
     (this as? NewsException)?.error ?: NewsError.Unknown(message.orEmpty())
 ```
-* `safeCall` (repository) menghasilkan `NetworkResult`; kedua `PagingSource` membuka hasilnya: `Success` → `LoadResult.Page`, `Error(e)` → `LoadResult.Error(NewsException(e))`. `CancellationException` tetap di-*rethrow*.
-* UI membaca `loadState.refresh/append` → `(error as Throwable).toNewsError()` lalu memetakan ke pesan dan aksi FR-07.
+* `safeCall` (repository) menghasilkan `NetworkResult`; kedua `RemoteMediator` membuka hasilnya: `Success` → simpan ke Room, `Error(e)` → `MediatorResult.Error(NewsException(e))`. `CancellationException` tetap di-*rethrow*.
+* UI membaca `loadState` → `(error as Throwable).toNewsError()` lalu memetakan ke pesan dan aksi FR-07. Karena data lokal tetap tampil, error hanya menjadi **layar penuh** bila `itemCount == 0`; bila sudah ada data, error menjadi **banner/footer** (lihat §2 *Model Offline*).
+
+### Model Offline (Room, `:core:database`)
+```kotlin
+@Entity(tableName = "sources")
+data class SourceEntity(@PrimaryKey val id: String, val name: String, val description: String,
+                        val category: String, val language: String, val country: String)
+
+@Entity(tableName = "articles",
+        indices = [Index(value = ["sourceId", "queryKey", "url"], unique = true)])
+data class ArticleEntity(@PrimaryKey(autoGenerate = true) val rowId: Long = 0,
+                         val sourceId: String, val queryKey: String, val url: String,
+                         val sourceName: String, val author: String, val title: String,
+                         val description: String, val imageUrl: String,
+                         val publishedAt: String, val content: String)
+
+@Entity(tableName = "remote_keys")
+data class RemoteKeyEntity(@PrimaryKey val key: String,   // "sources:<category>:<lang>" atau "articles:<sourceId>:<queryKey>"
+                           val nextPage: Int?, val fetchedAt: Long)
+```
+* `ORDER BY rowId` menjaga urutan API; `rowId` dipakai sebagai kunci item Compose (menyelesaikan duplikat `url` antar halaman, AC 6.3).
+* `queryKey` = query yang sudah di-`trim` dan di-*lowercase*; `""` untuk daftar default.
+* DAO mengembalikan `PagingSource<Int, Entity>`; pencarian sumber memakai `WHERE category = :c AND (name LIKE :q OR description LIKE :q)`.
+* `fetchedAt` memakai jam yang dapat disuntik (`Clock`/lambda) agar TTL bisa diuji.
 
 ---
 
 ## 3. Sequence Diagrams
 
-### A. Sumber: Fetch Sekali, Paginasi Klien, Pencarian
+### A. Sumber: Room sebagai Sumber Kebenaran, TTL, Pencarian
 
 ```mermaid
 sequenceDiagram
@@ -172,40 +199,40 @@ sequenceDiagram
     actor User
     participant UI as SourcesScreen
     participant VM as SourcesViewModel
-    participant Pager as Paging 3
-    participant Src as SourcesPagingSource
-    participant Cache as SourcesCache
+    participant Pager as Paging 3 (20/halaman)
+    participant DB as Room (sources, remote_keys)
+    participant Med as SourcesRemoteMediator
     participant API as NewsApiService
 
     User->>UI: Pilih kategori
     UI->>VM: init(category)
     VM->>Pager: sources(category, query = "")
-    Pager->>Src: load(Refresh)
-    Src->>Cache: get(category)
-    alt Cache kosong
-        Cache->>API: GET /top-headlines/sources?category=&language=en
+    Pager->>Med: initialize()
+    Med->>DB: baca remote_keys(sources:category:en)
+    alt Belum ada atau fetchedAt lebih tua dari 24 jam
+        Med-->>Pager: LAUNCH_INITIAL_REFRESH
+        Pager->>Med: load(REFRESH)
+        Med->>API: GET /top-headlines/sources?category=&language=en
         alt 200 OK
-            API-->>Cache: daftar sumber (semua)
-            Cache-->>Src: List<NewsSource>
+            API-->>Med: daftar sumber (semua)
+            Med->>DB: transaksi: hapus kategori lama, insert baru, simpan fetchedAt
+            Med-->>Pager: Success(endOfPaginationReached = true)
         else Gagal (offline / 401 / 429 / JSON rusak)
-            API-->>Src: Exception
-            Src-->>Pager: LoadResult.Error
-            Pager-->>UI: refresh = Error (layar error + Retry)
+            API-->>Med: Exception
+            Med-->>Pager: MediatorResult.Error(NewsException)
+            Note over UI: Cache kosong: layar error + Retry.<br/>Cache ada: tampil data + banner (tanpa menghapus data)
         end
-    else Cache terisi
-        Cache-->>Src: List<NewsSource>
+    else Masih segar
+        Med-->>Pager: SKIP_INITIAL_REFRESH (tanpa panggilan API)
     end
-    Src-->>Pager: Page(items[0..19], nextKey = 2)
-    User->>UI: Scroll mendekati akhir
-    Pager->>Src: load(Append(2))
-    Src->>Cache: get(category) (tanpa panggilan API)
-    Src-->>Pager: Page(items[20..39])
+    Pager->>DB: PagingSource (LIMIT 20 per halaman)
+    DB-->>UI: items[0..19]; scroll menambah 20 berikutnya dari DB
     User->>UI: Ketik "bbc"
     UI->>VM: onQueryChange("bbc")
-    VM->>Pager: sources(category, "bbc") (filter di memori)
+    VM->>Pager: sources(category, "bbc") (query LIKE di Room; TTL masih segar, tanpa API)
 ```
 
-### B. Artikel: Endless Scroll, Error Append, Akhir Daftar
+### B. Artikel: Mediator, Endless Scroll, Offline, Akhir Daftar
 
 ```mermaid
 sequenceDiagram
@@ -213,29 +240,44 @@ sequenceDiagram
     actor User
     participant Grid as ArticlesScreen
     participant Pager as Paging 3
-    participant Src as ArticlesPagingSource
+    participant DB as Room (articles, remote_keys)
+    participant Med as ArticlesRemoteMediator
     participant API as NewsApiService
 
-    User->>Grid: Scroll mendekati akhir halaman 1
-    Grid->>Pager: Muat halaman 2
-    Pager->>Src: load(Append(2))
-    Src->>API: GET /top-headlines?sources=&page=2&pageSize=20
-
-    alt Sukses
-        API-->>Src: 200 OK (articles, totalResults)
-        Src-->>Pager: Page(data, prevKey=1, nextKey = 3 atau null)
-        Note over Src: nextKey = null bila page x pageSize >= totalResults<br/>atau halaman kosong
-    else Batas hasil paket tercapai (kode belum terverifikasi)
-        API-->>Src: error maximumResultsReached
-        Src-->>Pager: Page(emptyList, nextKey = null)
-        Note over Grid: Dianggap akhir daftar, bukan error
-    else Gagal jaringan / JSON rusak
-        API-->>Src: Exception
-        Src-->>Pager: LoadResult.Error(e)
-        Pager-->>Grid: append = Error
-        Note over Grid: Artikel halaman 1 tetap tampil.<br/>Footer "Failed to load more - Retry"
-        User->>Grid: Tap Retry
-        Grid->>Pager: retry()
+    Grid->>Pager: Buka sumber (queryKey = "")
+    Pager->>Med: initialize()
+    alt fetchedAt lebih tua dari 1 jam atau belum ada
+        Med-->>Pager: LAUNCH_INITIAL_REFRESH
+        Pager->>Med: load(REFRESH)
+        Med->>API: GET /top-headlines?sources=&page=1&pageSize=20
+        API-->>Med: 200 OK
+        Med->>DB: transaksi: hapus (sourceId, queryKey), insert halaman 1, simpan nextPage + fetchedAt
+    else Masih segar
+        Med-->>Pager: SKIP_INITIAL_REFRESH
+    end
+    DB-->>Grid: artikel dari Room (selalu tampil lebih dulu)
+    User->>Grid: Scroll mendekati akhir
+    Pager->>Med: load(APPEND)
+    Med->>DB: baca nextPage dari remote_keys
+    alt nextPage == null
+        Med-->>Pager: Success(endOfPaginationReached = true)
+    else Ada halaman berikutnya
+        Med->>API: GET /top-headlines?sources=&page=nextPage&pageSize=20
+        alt Sukses
+            API-->>Med: 200 OK (articles, totalResults)
+            Med->>DB: transaksi: insert artikel, update nextPage
+            Note over Med: nextPage = null bila page x pageSize >= totalResults<br/>atau halaman kosong
+        else Batas hasil paket tercapai (kode belum terverifikasi)
+            API-->>Med: error maximumResultsReached
+            Med-->>Pager: Success(endOfPaginationReached = true)
+            Note over Grid: Dianggap akhir daftar, bukan error
+        else Gagal jaringan / JSON rusak / rateLimited
+            API-->>Med: Exception
+            Med-->>Pager: MediatorResult.Error(NewsException)
+            Note over Grid: Artikel di Room tetap tampil.<br/>Footer "Failed to load more - Retry" (rateLimited: tanpa Retry)
+            User->>Grid: Tap Retry
+            Grid->>Pager: retry()
+        end
     end
 ```
 
@@ -252,12 +294,12 @@ sequenceDiagram
 
     User->>UI: Ketik "e"
     UI->>VM: onQueryChange("e")
-    Note over VM: < 2 karakter: tidak ada panggilan API
+    Note over VM: < 2 karakter: dipetakan ke "" (daftar default dari Room, tanpa API pencarian)
     User->>UI: Ketik "el", "ele", "elec" (cepat)
     UI->>VM: onQueryChange(...) berulang
     Note over VM: debounce 500 ms, hanya nilai terakhir lolos
     VM->>Pager: articles(sourceId, "elec") via flatMapLatest
-    Pager->>API: GET /top-headlines?sources=&q=elec&page=1
+    Pager->>API: via RemoteMediator: GET /top-headlines?sources=&q=elec&page=1 (queryKey = elec, disimpan terpisah di Room)
     User->>UI: Ketik "t" sebelum respons tiba
     Note over VM: flatMapLatest membatalkan permintaan lama
     VM->>Pager: articles(sourceId, "elect")
@@ -307,13 +349,14 @@ sequenceDiagram
 
 ### ADR-002: Paging 3 untuk Sumber dan Artikel
 * **Context:** US6 mewajibkan *endless scrolling* di sumber dan artikel, lengkap dengan kasus error.
-* **Decision:** Keduanya memakai `PagingSource` → `Flow<PagingData<T>>` (`cachedIn(viewModelScope)`) → `collectAsLazyPagingItems()`.
-* **Consequences:** (+) state `Refresh/Append`, retry, dan pembatalan sudah standar. (−) perlu footer khusus di `:core:ui`.
+* **Decision:** Keduanya memakai Room `PagingSource` + `RemoteMediator` (ADR-013) → `Flow<PagingData<T>>` (`cachedIn(viewModelScope)`) → `collectAsLazyPagingItems()`.
+* **Consequences:** (+) state `Refresh/Append`, retry, dan pembatalan sudah standar. (−) perlu footer dan banner khusus di `:core:ui`.
 
-### ADR-003: Paginasi Sisi Klien untuk Sumber (Cache di Memori)
+### ADR-003: Paginasi Sisi Klien untuk Sumber (Cache di Memori) — *Digantikan oleh ADR-013*
 * **Context:** `/top-headlines/sources` tidak punya `page`/`pageSize` dan tidak punya `q`. Kuota hanya 100 request/hari.
 * **Decision:** `SourcesCache` mengambil daftar sekali per kategori (dan bahasa), lalu `SourcesPagingSource` mengiris 20 item per halaman dari cache; pencarian memfilter daftar di memori sebelum diiris.
 * **Consequences:** (+) memenuhi US6 dan US5 tanpa memboroskan kuota; rotasi dan kembali ke layar tidak memanggil API. (−) cache hilang saat proses mati (diterima; tanpa database sesuai ADR-008). Kegagalan tidak di-cache.
+* **Status:** digantikan ADR-013. Yang tetap berlaku: endpoint sources diambil sekali per kategori; paginasi 20 item kini dilakukan Room.
 
 ### ADR-004: Model Error Bertipe yang Dibaca dari Body
 * **Context:** NewsAPI mengembalikan `{status, code, message}`; dokumentasi tidak memetakan kode ke status HTTP.
@@ -322,7 +365,7 @@ sequenceDiagram
 
 ### ADR-005: Gson sebagai Converter JSON
 * **Decision:** Retrofit + `GsonConverterFactory`; semua field DTO nullable dengan default `null` (supaya ada constructor tanpa argumen dan Gson tidak melewati nilai default); `@SerializedName` di baris sendiri; aturan R8 DTO di `consumer-rules.pro`.
-* **Consequences:** (+) sederhana dan konsisten dengan Katha. (−) berbasis reflection dan tidak mengenal nullability Kotlin; ditutup dengan DTO nullable dan mapper yang defensif.
+* **Consequences:** (+) sederhana dan umum dipakai di Android. (−) berbasis reflection dan tidak mengenal nullability Kotlin; ditutup dengan DTO nullable dan mapper yang defensif.
 
 ### ADR-006: Artikel dari `top-headlines` per Sumber
 * **Decision:** `GET /top-headlines?sources=<id>&q=&page=&pageSize=20`. `sources` tidak boleh digabung `country`/`category`; alur kita memakai kategori hanya di layar sumber.
@@ -333,9 +376,9 @@ sequenceDiagram
 * **Decision:** `WebView` dengan JavaScript aktif (dibutuhkan situs berita), `allowFileAccess=false`, `allowContentAccess=false`, mixed content ditolak, hanya skema `http/https`, progress dari `WebChromeClient`, error main-frame dari `WebViewClient.onReceivedError`, `BackHandler` untuk riwayat web, `destroy()` saat keluar. `http://` dicoba sebagai `https://`; bila gagal ditawarkan **Open in browser**.
 * **Consequences:** (+) aman tanpa melonggarkan cleartext untuk seluruh aplikasi. (−) sebagian situs `http`-only tidak bisa dimuat di dalam aplikasi.
 
-### ADR-008: Tanpa Database Lokal pada Iterasi Ini
-* **Decision:** Tidak ada Room/`RemoteMediator`; cache sumber hanya di memori.
-* **Consequences:** (+) fokus pada paginasi, pencarian, error. (Future) `:core:database` untuk mode offline.
+### ADR-008: Tanpa Database Lokal pada Iterasi Ini — *Digantikan oleh ADR-013*
+* **Decision (lama):** Tidak ada Room/`RemoteMediator`; cache sumber hanya di memori.
+* **Status:** digantikan ADR-013 karena kuota 100 request/hari membuat cache persisten bernilai tinggi.
 
 ### ADR-009: `:core:common` dan `:domain` sebagai Android Library Tanpa UI
 * **Context:** Bundle `koin-android`/`koin-androidx-compose` berupa AAR sehingga tidak bisa dikonsumsi modul JVM murni.
@@ -351,13 +394,36 @@ sequenceDiagram
 * **Consequences:** (+) hemat kuota, tanpa hasil basi. (−) pengujian perlu *virtual time* (`runTest` + Turbine).
 
 ### ADR-012: Struktur Modul Berbasis Lapisan dan Fitur
-* **Decision:** `:core:*`, `:domain`, `:data`, `:feature:*` seperti Katha; satu file per class model/use case; satu komponen daftar paging bersama di `:core:ui` bila pola loading/error/footer berulang.
+* **Decision:** `:core:*`, `:domain`, `:data`, `:feature:*` berbasis lapisan dan fitur; satu file per class model/use case; satu komponen daftar paging bersama di `:core:ui` bila pola loading/error/footer berulang.
 * **Consequences:** (+) batas dependensi ditegakkan compiler. (−) konfigurasi Gradle awal lebih banyak (dimitigasi version catalog).
+
+### ADR-013: Offline-First dengan Room, `RemoteMediator`, dan Retrofit
+* **Context:** Kuota Developer hanya 100 request/hari dan artikel tertunda 24 jam, sehingga memuat ulang tiap kali layar dibuka memboroskan kuota tanpa data yang lebih baru. Pengguna juga ingin membaca daftar yang sudah pernah dimuat saat offline.
+* **Decision:**
+  * **Room adalah sumber kebenaran.** UI hanya mengamati `PagingSource` Room; Retrofit hanya menulis ke Room lewat `RemoteMediator`. Domain tetap `Flow<PagingData<T>>` sehingga `:domain` dan `:feature:*` tidak berubah.
+  * **Modul `:core:database`** (Room 3 `androidx.room3`: `room3-runtime`, `room3-paging`, KSP; plugin `beacon.android.room`). Hanya `:data` yang bergantung padanya; mapper DTO → Entity → Domain berada di `:data`.
+  * **`SourcesRemoteMediator`:** `initialize()` mengembalikan `SKIP_INITIAL_REFRESH` bila `remote_keys.fetchedAt` kurang dari **24 jam**. `REFRESH` mengambil seluruh daftar kategori dalam satu panggilan, mengganti baris kategori itu dalam satu transaksi, dan mengakhiri paging (`endOfPaginationReached = true`). Paginasi 20 item dan pencarian (`LIKE`) dilakukan Room, tanpa panggilan API.
+  * **`ArticlesRemoteMediator`:** kunci per `(sourceId, queryKey)`; TTL **1 jam** (artikel memang tertunda 24 jam, jadi TTL pendek tidak memberi data lebih baru). `REFRESH` halaman 1 menghapus baris `(sourceId, queryKey)` lama; `APPEND` membaca `nextPage` dari `remote_keys`; `PREPEND` langsung berakhir. Hapus-dan-insert serta update key selalu dalam satu `withTransaction`.
+  * **Aturan error:** kegagalan tidak menghapus data lokal. Layar error penuh hanya bila `itemCount == 0`; selain itu banner "Offline, menampilkan data tersimpan" (refresh) atau footer Retry (append). `rateLimited`/`apiKeyExhausted`: tanpa *auto-retry*, tetap tampilkan cache dengan banner kuota.
+  * **Pencarian artikel** tetap memanggil API (`q`) lewat `queryKey` sendiri; hasilnya ikut di-cache. Offline tanpa cache untuk query itu menampilkan error (TC-34).
+  * **Retensi:** hapus artikel lebih tua dari 7 hari dan batasi total baris; skema cache boleh memakai `fallbackToDestructiveMigration` karena data dapat diambil ulang (`exportSchema = true`).
+  * **Gambar:** disk cache Coil 3 menyediakan gambar offline tanpa kerja tambahan. Halaman `WebView` tetap membutuhkan internet (AC 4.2).
+  * **Fase:** (1) Room + mediator sumber; (2) mediator artikel, banner offline, retensi.
+* **Consequences:** (+) hemat kuota, daftar tersedia offline, tidak ada layar kosong saat gagal, kunci item stabil lewat `rowId`. (−) `RemoteMediator` mudah salah (transaksi, kunci halaman, refresh yang membuat daftar melompat; dimitigasi TTL di `initialize()`); satu modul dan dua mapper tambahan; pengujian DAO butuh `androidTest` atau Robolectric (JUnit 4, bertentangan dengan platform JUnit 5 kecuali ditambah mesin vintage), sedangkan mediator dapat diuji dengan `paging-testing` bila DAO berada di balik interface dan diganti fake. Room 3 (3.0.3) hanya mendukung KSP dan sudah terverifikasi berjalan dengan AGP 9.5 dan KSP 2.3.x (`:core:database:kspDebugKotlin` lulus); skema diekspor ke `core/database/schemas/`.
+
+### ADR-014: Dependency dan Konfigurasi Bersama lewat `build-logic`
+* **Context:** Sepuluh modul akan mengulang SDK level, Java 17, JUnit 5, Compose BOM, dan Koin. Duplikasi membuat versi melenceng dan aturan batas modul hanya berupa konvensi.
+* **Decision:**
+  * **Satu sumber versi:** `gradle/libs.versions.toml` (library, bundle, dan artefak plugin Gradle untuk `build-logic`); tidak ada blok `[plugins]` maupun `plugins {}` di root.
+  * **Included build `build-logic`** berisi *precompiled script plugin* dan konstanta `BeaconBuild` (compileSdk/targetSdk 37, minSdk 24, JVM 17, namespace `com.halimjr11.beacon.<modul>` otomatis).
+  * **Plugin konvensi:** `beacon.android.library` (SDK, Java 17, JUnit 5, bundle unit-test) → `beacon.android.library.compose` (+ Compose BOM/bundle) → `beacon.android.feature` (+ `:core:common`, `:core:ui`, `:domain`, Koin, lifecycle, paging-testing); `beacon.android.room` (KSP + plugin Room 3 + skema); `beacon.android.application` (+ plugin serialization).
+  * **Penegak batas modul:** `beacon.android.feature` menggagalkan build bila fitur bergantung pada `:data`, `:core:network`, atau `:core:database`. Build file tiap fitur hanya `plugins { id("beacon.android.feature") }`.
+* **Consequences:** (+) versi dan aturan di satu tempat, modul baru cukup satu baris plugin, matriks dependensi ditegakkan build. (−) ada satu included build tambahan; plugin yang dipasang lewat `build-logic` harus diterapkan dari script konvensi (bukan `plugins {}` modul), karena classpath-nya tidak terlihat oleh modul.
 
 ---
 
 ## 5. Build, Keamanan & Rilis
-* **Toolchain:** AGP 9.x tanpa plugin `org.jetbrains.kotlin.android` (Kotlin sudah built-in), Kotlin 2.4.x, JDK 17, Gradle version catalog.
+* **Toolchain:** AGP 9.x tanpa plugin `org.jetbrains.kotlin.android` (Kotlin sudah built-in), Kotlin 2.4.x, JDK 17, Gradle version catalog + plugin konvensi `build-logic` (ADR-014). KSP hanya diterapkan di `:core:database` (Room); Koin tetap tanpa KSP (ADR-001).
 * **R8:** aktif pada `release` dengan `-obfuscationdictionary`, `-repackageclasses ''`, dan `consumer-rules.pro` untuk DTO. Setelah build, periksa `mapping.txt` memastikan class sendiri benar-benar teracak.
 * **Network security config:** `cleartextTrafficPermitted="false"`; satu-satunya pengecualian adalah `network_security_config.xml` di source set `debug` yang mengizinkan cleartext hanya ke `10.0.2.2` (server tiruan QA). Release tidak memiliki pengecualian.
 * **Base URL uji:** `NEWS_API_BASE_URL` opsional di `local.properties` → `BuildConfig` (default `https://newsapi.org/v2/`; hanya dibaca di build debug). Dipakai untuk mengarahkan QA manual ke MockWebServer/server tiruan (lihat Test Plan §1) agar kasus kuota habis, sumber hilang, kosong, dan field null bisa dipicu.
@@ -370,10 +436,11 @@ sequenceDiagram
 | Unit: `:core:common` | JUnit 5 `@ParameterizedTest` | Formatter tanggal, `NetworkResult` |
 | Unit: `:core:network` | JUnit 5, MockK | Interceptor header, parser error (semua `code`, body rusak), parsing DTO |
 | Unit: `:domain` | JUnit 5, MockK, Turbine | Use case meneruskan argumen dan hasil |
-| Unit: `:data` | JUnit 5, MockK, `asSnapshot` | Mapper, `SourcesCache`, kedua `PagingSource`, repository, cancellation |
+| Unit: `:data` | JUnit 5, MockK, `TestPager`, `asSnapshot` | Mapper (DTO→Entity→Domain), kedua `RemoteMediator` (TTL, REFRESH/APPEND, `endOfPagination`, error tidak menghapus data, transaksi), repository, cancellation |
+| Instrumented: `:core:database` | JUnit 4, Room in-memory | DAO (urutan `rowId`, `LIKE`, indeks unik, hapus per kunci), `remote_keys` |
 | Unit: `:feature:*` | JUnit 5, Turbine | ViewModel: loading → data, pencarian, debounce, retry |
 | DI | Koin `verify` | Graf lintas modul |
-| Manual | Emulator + `adb` | Alur 4 layar, scroll, cari, offline, kunci salah, WebView |
+| Manual | Emulator + `adb` | Alur 4 layar, scroll, cari, offline dengan dan tanpa cache, kuota habis, kunci salah, WebView |
 | Compose UI & instrumented (`androidTest`) | – | **Segera ditambahkan** (tetap JUnit 4) |
 
 Detail kasus uji ada di [test_plan_and_qa.md](test_plan_and_qa.md).

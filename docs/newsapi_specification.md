@@ -49,10 +49,10 @@
   * Buang item tanpa `id` atau dengan `name` kosong.
   * `description`, `category`, `language`, `country` yang `null` → `""`.
   * `country` ditampilkan sebagai kode huruf besar (`GB`), `language` sebagai kode huruf besar (`EN`).
-* **Strategi Pemakaian (ADR-003):**
-  * Diambil **sekali per kategori**, disimpan di `SourcesCache` (memori, kunci = `category + language`).
-  * `SourcesPagingSource` mengiris daftar tersimpan **20 item per halaman**; query pencarian memfilter sebelum diiris.
-  * Kegagalan **tidak** di-cache; Retry memanggil API lagi.
+* **Strategi Pemakaian (ADR-013):**
+  * Diambil **sekali per kategori** oleh `SourcesRemoteMediator` dan disimpan di Room (`remote_keys` kunci = `sources:<category>:<language>`, TTL 24 jam).
+  * Room `PagingSource` memberi **20 item per halaman**; pencarian memakai `LIKE` di Room.
+  * Kegagalan **tidak** menghapus data lokal; Retry memanggil API lagi.
 
 ---
 
@@ -87,7 +87,7 @@
   }
   ```
   `content` dipotong 200 karakter (dokumentasi); penanda `[+N chars]` di akhir *(belum terverifikasi)*. Detail lengkap hanya lewat `url` (FR-04).
-* **Pagination Logic (`ArticlesPagingSource`):**
+* **Pagination Logic (`ArticlesRemoteMediator`):**
   * `prevKey = if (page == 1) null else page - 1`
   * `nextKey = null` bila **salah satu** benar: `articles` kosong, `page * pageSize >= totalResults`, atau API menolak halaman berikutnya karena batas hasil paket (*kode error belum terverifikasi*, lihat §3).
   * Selain itu `nextKey = page + 1`.

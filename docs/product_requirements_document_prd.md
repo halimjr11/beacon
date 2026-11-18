@@ -3,7 +3,7 @@
 ## 1. Document Control & Overview
 * **Product Name:** Beacon *(mercusuar: penunjuk arah di tengah lautan informasi, merepresentasikan aplikasi yang membantu pengguna menemukan berita dari sumber yang tepat)*
 * **Package Name:** `com.halimjr11.beacon`
-* **Tech Stack:** Kotlin, Jetpack Compose (Material 3), MVVM, Clean Architecture, Coroutines & Flow, Koin 4.2.2, Navigation 3, Paging 3, Retrofit + OkHttp + Gson, Coil 3, Android `WebView`.
+* **Tech Stack:** Kotlin, Jetpack Compose (Material 3), MVVM, Clean Architecture, Coroutines & Flow, Koin 4.2.2, Navigation 3, Paging 3, Room (offline-first, `RemoteMediator`), Retrofit + OkHttp + Gson, Coil 3, Android `WebView`.
 * **Target Platform:** Android (Min SDK 24 / Android 7.0, Target SDK 37).
 * **Data Source:** [NewsAPI](https://newsapi.org) v2 (`/v2/top-headlines/sources`, `/v2/top-headlines`).
 * **Objective:** Aplikasi native untuk menjelajahi berita lewat alur **Kategori → Sumber Berita → Artikel → Detail Artikel (web view)**, dilengkapi pencarian sumber dan artikel, *endless scrolling*, serta penanganan kasus positif dan negatif yang menyeluruh.
@@ -15,10 +15,11 @@
 | A2 | Artikel diambil dari `top-headlines` dengan `sources=<id>`, bukan `everything`. | Sesuai alur "berita utama per sumber"; `q` tetap bisa dipakai untuk pencarian. |
 | A3 | Detail artikel memakai `WebView` (bukan Custom Tabs). | Sesuai user story 4. |
 | A4 | Pencarian artikel memanggil API (`q`) dengan debounce; pencarian sumber memfilter di sisi klien. | API sources tidak punya parameter pencarian. |
-| A5 | Tidak ada database lokal pada iterasi ini. | Fokus pada paginasi, pencarian, dan penanganan error. |
+| A5 | **Offline-first:** Room adalah sumber kebenaran untuk sumber dan artikel; jaringan hanya mengisi Room lewat `RemoteMediator` (ADR-013). | Kuota 100 request/hari dan kebutuhan membaca daftar saat offline. |
+| A6 | TTL cache: sumber **24 jam**, artikel **1 jam**; retensi artikel 7 hari. | Artikel NewsAPI Developer tertunda 24 jam, jadi TTL pendek tidak memberi data lebih baru. |
 
 ### 1.2 Di Luar Cakupan (Out of Scope)
-Bookmark/favorit, cache offline (Room), notifikasi, login, berbagi artikel, Custom Tabs, endpoint `/v2/everything`, mode gelap khusus per layar, Compose UI test dan instrumented test (**segera ditambahkan** setelah fitur stabil).
+Bookmark/favorit, sinkronisasi latar belakang (WorkManager), pull-to-refresh manual, notifikasi, login, berbagi artikel, Custom Tabs, endpoint `/v2/everything`, mode gelap khusus per layar, Compose UI test dan instrumented test (**segera ditambahkan** setelah fitur stabil).
 
 ---
 
@@ -75,16 +76,16 @@ Bookmark/favorit, cache offline (Room), notifikasi, login, berbagi artikel, Cust
   * `TopAppBar` menampilkan nama kategori dan tombol *Back*.
   * Di bawahnya ada *search field* (FR-05).
   * Setiap item: **nama sumber**, **deskripsi** (maks. 2 baris), dan label **bahasa/negara**.
-  * Endpoint sources **tidak punya paginasi**, sehingga daftar diambil sekali, disimpan di memori, lalu ditampilkan **20 item per halaman** secara bertahap (*endless scrolling* sisi klien).
+  * Endpoint sources **tidak punya paginasi**, sehingga daftar diambil sekali per kategori, disimpan di Room (TTL 24 jam), lalu ditampilkan **20 item per halaman** secara bertahap dari Room (*endless scrolling* sisi klien).
 * **Acceptance Criteria:**
   * **AC 2.1 (Positive):** Daftar sumber kategori tampil; tap membuka `ArticlesScreen` untuk sumber itu.
   * **AC 2.2 (Loading):** *Progress indicator* di tengah saat pemuatan awal.
-  * **AC 2.3 (Negative - Initial Error):** Gagal memuat (offline, timeout, JSON rusak, 5xx) → layar error ramah + tombol **Retry**.
+  * **AC 2.3 (Negative - Initial Error):** Gagal memuat saat **cache kosong** (offline, timeout, JSON rusak, 5xx) → layar error ramah + tombol **Retry**. Bila cache ada, lihat AC 8.2.
   * **AC 2.4 (Negative - Empty):** Tidak ada sumber untuk kategori → teks *"No sources found."*
   * **AC 2.5 (Endless Scroll):** Scroll mendekati akhir 20 item pertama menambah 20 item berikutnya tanpa memuat ulang API.
   * **AC 2.6 (Negative - API Key):** `apiKeyInvalid` / `apiKeyMissing` / `apiKeyDisabled` → pesan konfigurasi tanpa tombol Retry yang menyesatkan.
   * **AC 2.7 (Negative - Rate Limit):** `rateLimited` / `apiKeyExhausted` → pesan *"Daily request limit reached. Try again later."*
-  * **AC 2.8 (Cache):** Kembali ke layar yang sama (atau memutar layar) tidak memanggil API lagi.
+  * **AC 2.8 (Cache):** Kembali ke layar yang sama, memutar layar, atau membuka ulang aplikasi dalam TTL tidak memanggil API lagi (data dari Room).
 
 ### FR-03: Artikel per Sumber (US3, US6)
 * **Deskripsi:** Menampilkan artikel sumber terpilih (`/v2/top-headlines?sources=<id>&page=&pageSize=20`).
@@ -95,8 +96,8 @@ Bookmark/favorit, cache offline (Room), notifikasi, login, berbagi artikel, Cust
 * **Acceptance Criteria:**
   * **AC 3.1 (Positive):** Artikel sumber tampil sesuai urutan API; tap membuka `ArticleWebScreen`. Bila verifikasi panggilan nyata menunjukkan urutan terbalik (lihat API Spec §Endpoint 2), tiap halaman diurutkan di klien dari terbaru ke terlama.
   * **AC 3.2 (Loading):** *Progress indicator* saat pemuatan awal.
-  * **AC 3.3 (Negative - Initial Error):** Gagal pada halaman 1 → layar error + **Retry**.
-  * **AC 3.4 (Negative - Append Error):** Gagal pada halaman ke-2 dst → artikel sebelumnya tetap tampil, footer **"Failed to load more — Retry"**.
+  * **AC 3.3 (Negative - Initial Error):** Gagal pada halaman 1 saat **cache kosong** → layar error + **Retry**. Bila cache ada, lihat AC 8.2.
+  * **AC 3.4 (Negative - Append Error):** Gagal pada halaman ke-2 dst → artikel di Room tetap tampil, footer **"Failed to load more — Retry"** (`rateLimited`: tanpa Retry).
   * **AC 3.5 (Negative - Empty):** Tidak ada artikel → *"No articles found."*
   * **AC 3.6 (Edge - Missing Fields):** `urlToImage`, `author`, `description`, atau `content` bernilai `null` tidak menyebabkan crash; gambar memakai placeholder.
   * **AC 3.7 (Edge - Unusable Item):** Artikel tanpa `url` atau dengan judul `"[Removed]"` tidak ditampilkan.
@@ -155,6 +156,18 @@ Bookmark/favorit, cache offline (Room), notifikasi, login, berbagi artikel, Cust
   * **AC 7.2:** Pembatalan coroutine (mis. keluar layar) **tidak** diubah menjadi error.
   * **AC 7.3:** Pesan error tidak membocorkan API key atau URL permintaan.
 
+### FR-08: Offline-First & Cache (US7)
+* **Deskripsi:** Daftar sumber dan artikel dibaca dari Room; jaringan hanya menyegarkannya (ADR-013).
+* **Acceptance Criteria:**
+  * **AC 8.1 (TTL):** Membuka layar yang cache-nya masih segar (sumber < 24 jam, artikel < 1 jam per sumber dan query) **tidak** memanggil API. Cache yang kedaluwarsa disegarkan otomatis saat layar dibuka.
+  * **AC 8.2 (Offline dengan Cache):** Offline atau gagal menyegarkan saat cache ada → data tersimpan tetap tampil dengan banner **"Offline, menampilkan data tersimpan"**; data lokal tidak dihapus oleh kegagalan.
+  * **AC 8.3 (Cache Kosong):** Offline tanpa cache → layar error + **Retry** (AC 2.3, 3.3). Pencarian artikel yang belum pernah di-cache saat offline → pesan error + **Retry** (AC 5.7).
+  * **AC 8.4 (Atomik):** Penyegaran mengganti data lama dan data baru dalam satu transaksi; pengguna tidak pernah melihat daftar setengah terhapus.
+  * **AC 8.5 (Kuota):** `rateLimited` / `apiKeyExhausted` → cache tetap tampil dengan banner kuota, tanpa *auto-retry*.
+  * **AC 8.6 (Urutan & Kunci):** Urutan artikel sama dengan urutan API; kunci item daftar stabil walau `url` sama muncul di halaman berbeda (AC 6.3).
+  * **AC 8.7 (Retensi):** Artikel lebih tua dari 7 hari dan baris di atas batas total dibersihkan; pembersihan tidak mengganggu daftar yang sedang tampil.
+  * **AC 8.8 (Gambar & WebView):** Gambar yang pernah dimuat tersedia offline (disk cache Coil). Membuka artikel saat offline tetap menampilkan error + Retry + Open in browser (AC 4.2).
+
 ---
 
 ## 5. Non-Functional Requirements (NFR)
@@ -165,18 +178,20 @@ Bookmark/favorit, cache offline (Room), notifikasi, login, berbagi artikel, Cust
   * Lalu lintas cleartext diblokir lewat network security config.
   * `WebView`: `allowFileAccess=false`, `allowContentAccess=false`, mixed content ditolak, hanya skema `http/https`.
   * R8 aktif pada build release dengan nama acak.
-* **Performance & Quota:** Paket Developer NewsAPI dibatasi **100 request/hari**. Cache sumber per kategori di memori, `cachedIn(viewModelScope)`, debounce pencarian, dan tidak ada *auto-retry* saat `rateLimited`.
+* **Performance & Quota:** Paket Developer NewsAPI dibatasi **100 request/hari**. Cache persisten di Room dengan TTL (sumber 24 jam, artikel 1 jam), `RemoteMediator`, `cachedIn(viewModelScope)`, debounce pencarian, dan tidak ada *auto-retry* saat `rateLimited`.
 * **Compatibility:** Min SDK 24; tanpa `java.time` (butuh API 26) dan tanpa `SimpleDateFormat` (tidak thread-safe); tanggal diformat dengan parser manual yang stateless.
 * **Accessibility:** Semua ikon berdeskripsi (`contentDescription`), target sentuh ≥ 48 dp, kontras warna memenuhi Material 3.
-* **Testability:** Unit test (JUnit 5 `@ParameterizedTest`, MockK, Turbine, paging-testing) untuk parser error, mapper, `PagingSource`, repository, `ViewModel`, dan verifikasi graf Koin. Compose UI test dan instrumented test menyusul.
+* **Testability:** Unit test (JUnit 5 `@ParameterizedTest`, MockK, Turbine, paging-testing) untuk parser error, mapper, `RemoteMediator`, repository, `ViewModel`, dan verifikasi graf Koin. Compose UI test dan instrumented test menyusul.
 
 ---
 
 ## 6. Risiko & Batasan
 | Risiko | Mitigasi |
 |---|---|
-| Paket Developer: 100 request/hari, artikel tertunda 24 jam, **hanya untuk dev/testing**. | Cache + debounce; catat di README bahwa rilis publik butuh paket berbayar. |
-| Sources tanpa paginasi dan tanpa pencarian server. | Paginasi dan filter di sisi klien (ADR-003). |
+| Paket Developer: 100 request/hari, artikel tertunda 24 jam, **hanya untuk dev/testing**. | Cache Room + TTL + debounce; catat di README bahwa rilis publik butuh paket berbayar. |
+| Sources tanpa paginasi dan tanpa pencarian server. | Fetch sekali per kategori ke Room; paginasi dan filter `LIKE` oleh Room (ADR-013). |
 | URL artikel `http://` berbenturan dengan pemblokiran cleartext. | Upgrade ke `https://`, fallback ke browser (AC 4.4). |
 | Perilaku API yang tidak terdokumentasi (batas hasil, urutan, `"[Removed]"`). | Ditandai *belum terverifikasi*; diuji dengan panggilan nyata sebelum dianggap final. |
 | Situs berita memuat skrip berat/iklan di `WebView`. | Pengaturan `WebView` yang diperketat; fallback ke browser. |
+| `RemoteMediator` kompleks (transaksi, kunci halaman, daftar melompat saat refresh). | TTL di `initialize()`, transaksi tunggal, test mediator dengan `TestPager` (ADR-013). |
+| Data cache basi atau terlalu besar. | TTL, retensi 7 hari, batas jumlah baris, `fallbackToDestructiveMigration` untuk cache. |

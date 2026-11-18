@@ -7,6 +7,7 @@ Kategori → Sumber → Artikel → Detail (web view)
 
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4.x-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
+![Room](https://img.shields.io/badge/Room-offline--first-3DDC84?logo=android&logoColor=white)
 ![MinSdk](https://img.shields.io/badge/minSdk-24-blue)
 ![Status](https://img.shields.io/badge/status-perencanaan-orange)
 
@@ -19,8 +20,9 @@ Kategori → Sumber → Artikel → Detail (web view)
 | | Fitur | Detail |
 |---|---|---|
 | 🗂️ | **Kategori** | Tujuh kategori resmi NewsAPI (statis) |
-| 📰 | **Sumber berita** | Daftar sumber per kategori, endless scrolling (paginasi sisi klien) |
-| 🧾 | **Artikel** | Artikel per sumber, endless scrolling (paginasi server) |
+| 📰 | **Sumber berita** | Daftar sumber per kategori, endless scrolling dari Room (diisi sekali per kategori, TTL 24 jam) |
+| 🧾 | **Artikel** | Artikel per sumber, endless scrolling (Paging 3 + `RemoteMediator`, TTL 1 jam) |
+| 📴 | **Offline-first** | Room sebagai sumber kebenaran; daftar tetap tampil saat offline dengan banner, hemat kuota API |
 | 🌐 | **Detail artikel** | Dibuka di `WebView` dengan progress, error, dan fallback browser |
 | 🔎 | **Pencarian** | Sumber: filter lokal. Artikel: pencarian API dengan debounce |
 | 🧪 | **Kasus negatif** | Offline, kunci API salah, kuota habis, sumber hilang, JSON rusak |
@@ -34,19 +36,22 @@ graph LR
 
 ## 🏗 Arsitektur
 
-Multi-module Clean Architecture + MVVM (UDF), diturunkan dari Katha.
+Multi-module Clean Architecture + MVVM (UDF), offline-first: **Room** menyimpan data, **Retrofit** mengisinya lewat `RemoteMediator`, **Paging 3** menampilkannya.
 
 | Modul | Tanggung jawab |
 |---|---|
 | `:app` | Shell, navigasi (Navigation 3), `startKoin` |
 | `:core:common` | `NetworkResult`, `NewsError`, `DispatcherProvider`, formatter |
+| `:core:database` | Room: entity, DAO (`PagingSource`), `remote_keys` |
 | `:core:network` | Retrofit, OkHttp, Gson, `NewsApiService`, DTO, parser error |
 | `:core:ui` | Tema, komponen bersama, `SearchField` |
 | `:domain` | Model, `NewsRepository`, use case, `domainModule` |
-| `:data` | Repository, mapper, `SourcesCache`, `PagingSource` |
+| `:data` | Repository, mapper, `SourcesRemoteMediator`, `ArticlesRemoteMediator` |
 | `:feature:categories` `sources` `articles` `articleweb` | Layar dan ViewModel |
 
 Namespace: `com.halimjr11.beacon`.
+
+**Build bersama:** versi di `gradle/libs.versions.toml`; konfigurasi modul di included build `build-logic` (`beacon.android.library|library.compose|feature|room|application`). Modul fitur cukup `id("beacon.android.feature")`, dan build gagal bila fitur bergantung pada `:data`, `:core:network`, atau `:core:database`.
 
 ## 🚀 Mulai Cepat (setelah kode tersedia)
 
@@ -73,8 +78,11 @@ Namespace: `com.halimjr11.beacon`.
 ## 🚧 Status
 
 - [x] PRD, arsitektur, spesifikasi API, test plan
-- [ ] Bootstrap proyek dari template Katha
-- [ ] `:core:*`, `:domain`, `:data`
+- [x] Bootstrap proyek: modul Gradle kosong dan tema (`BeaconTheme`)
+- [x] Setup build bersama: `build-logic`, katalog versi, Room 3 + KSP di `:core:database`
+- [ ] `:core:*` (termasuk `:core:database`), `:domain`, `:data`
+- [ ] Offline-first fase 1: Room + mediator sumber
+- [ ] Offline-first fase 2: mediator artikel, banner offline, retensi
 - [ ] Layar kategori, sumber, artikel, dan web view
 - [ ] Unit test dan QA manual
 - [ ] Compose UI test dan instrumented test (menyusul)

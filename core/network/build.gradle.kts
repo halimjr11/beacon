@@ -1,7 +1,7 @@
 import java.util.Properties
 
 plugins {
-    alias(libs.plugins.android.library)
+    id("beacon.android.library")
 }
 
 val localProperties = Properties().apply {
@@ -12,21 +12,10 @@ val localProperties = Properties().apply {
 fun String.asBuildConfigString() = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
-    namespace = "com.halimjr11.beacon.network"
-    compileSdk {
-        version = release(37)
-    }
-
     defaultConfig {
-        minSdk = 24
-
         buildConfigField("String", "NEWS_API_KEY", (localProperties.getProperty("NEWS_API_KEY") ?: "").asBuildConfigString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         buildConfig = true
@@ -43,15 +32,9 @@ android {
     }
 }
 
-kotlin {
-    jvmToolchain(17)
-}
-
 dependencies {
     api(project(":core:common"))
     api(libs.bundles.koin.compose)
     api(libs.kotlinx.coroutines.android)
     implementation(libs.bundles.networking)
-
-    testImplementation(libs.bundles.unit.test)
 }

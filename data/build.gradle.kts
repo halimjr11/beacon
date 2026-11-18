@@ -1,29 +1,11 @@
 plugins {
-    alias(libs.plugins.android.library)
-}
-
-android {
-    namespace = "com.halimjr11.beacon.data"
-    compileSdk {
-        version = release(37)
-    }
-
-    defaultConfig {
-        minSdk = 24
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
-kotlin {
-    jvmToolchain(17)
+    id("beacon.android.library")
 }
 
 dependencies {
     api(project(":core:common"))
     implementation(project(":core:network"))
+    implementation(project(":core:database"))
     implementation(project(":domain"))
 
     api(libs.bundles.koin.compose)
@@ -31,6 +13,5 @@ dependencies {
     implementation(libs.androidx.paging.common)
     implementation(libs.retrofit.core)
 
-    testImplementation(libs.bundles.unit.test)
     testImplementation(libs.androidx.paging.testing)
 }
