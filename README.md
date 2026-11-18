@@ -80,9 +80,10 @@ Namespace: `com.halimjr11.beacon`.
 - [x] PRD, arsitektur, spesifikasi API, test plan
 - [x] Bootstrap proyek: modul Gradle kosong dan tema (`BeaconTheme`)
 - [x] Setup build bersama: `build-logic`, katalog versi, Room 3 + KSP di `:core:database`
-- [ ] `:core:*` (termasuk `:core:database`), `:domain`, `:data`
-- [ ] Offline-first fase 1: Room + mediator sumber
-- [ ] Offline-first fase 2: mediator artikel, banner offline, retensi
+- [x] `:core:*` (termasuk `:core:database`), `:domain`, `:data`
+- [x] Offline-first fase 1: Room + mediator sumber
+- [x] Offline-first fase 2 (data): mediator artikel, retensi (`CacheRetention`)
+- [ ] Offline-first fase 2 (UI): banner offline di layar, panggil `CacheRetention.purge()` saat start
 - [ ] Layar kategori, sumber, artikel, dan web view
 - [ ] Unit test dan QA manual
 - [ ] Compose UI test dan instrumented test (menyusul)
