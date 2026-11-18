@@ -10,8 +10,9 @@ room3 {
 }
 
 dependencies {
-    "implementation"(catalog.lib("androidx-room-runtime"))
-    "implementation"(catalog.lib("androidx-room-paging"))
+    // api: BeaconDatabase extends RoomDatabase and the DAOs return PagingSource, so :data needs both
+    "api"(catalog.lib("androidx-room-runtime"))
+    "api"(catalog.lib("androidx-room-paging"))
     "ksp"(catalog.lib("androidx-room-compiler"))
 
     "androidTestImplementation"(catalog.lib("androidx-room-testing"))

@@ -151,6 +151,7 @@ sealed interface NewsError {
     data object Server : NewsError
     data object Parse : NewsError
     data class Unknown(val message: String) : NewsError
+    data object EndOfResults : NewsError   // maximumResultsReached: akhir daftar, bukan kegagalan
 }
 ```
 `NetworkResult.Error` membawa `NewsError`; UI memetakan tipe ke pesan dan aksi (PRD §FR-07). Parser di `:core:network` membaca `code` dari body error.

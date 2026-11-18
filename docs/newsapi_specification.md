@@ -126,7 +126,7 @@
 | `parameterInvalid` | Parameter tidak didukung | `BadRequest` | Pesan umum + Retry |
 | `parametersMissing` | Parameter wajib hilang | `BadRequest` | Pesan umum + Retry |
 | `unexpectedError` | Kesalahan server | `Server` | Retry |
-| `maximumResultsReached` *(belum terverifikasi)* | Melewati batas hasil paket | — (akhir daftar, bukan error) | Hentikan paging |
+| `maximumResultsReached` *(belum terverifikasi)* | Melewati batas hasil paket | `EndOfResults` (akhir daftar; mediator mengubahnya jadi `endOfPaginationReached`) | Hentikan paging |
 | tidak dikenal | – | `Unknown` | Pesan umum + Retry |
 
 * **Kegagalan non-HTTP:**
