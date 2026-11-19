@@ -5,4 +5,12 @@
         <!-- Same as the Compose background, so a cold start does not flash black. -->
         <item name="android:windowBackground">#FFF8FAFC</item>
     </style>
+
+    <!-- Launch theme: the Android 12+ splash screen (and its compat backport for API 24-30).
+         Switches to Theme.Beacon as soon as the first frame is ready. -->
+    <style name="Theme.Beacon.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/beacon_navy</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_beacon_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.Beacon</item>
+    </style>
 </resources>

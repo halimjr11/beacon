@@ -3,10 +3,6 @@ package com.halimjr11.beacon.navigation
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -29,8 +25,17 @@ import com.halimjr11.beacon.categories.GenresScreen
 import com.halimjr11.beacon.domain.model.NewsCategory
 import com.halimjr11.beacon.domain.model.NewsFeed
 import com.halimjr11.beacon.home.HomeScreen
+import com.halimjr11.beacon.model.ArticleWebKey
+import com.halimjr11.beacon.model.CategoryArticlesKey
+import com.halimjr11.beacon.model.CategorySourcesKey
+import com.halimjr11.beacon.model.GenresKey
+import com.halimjr11.beacon.model.HomeKey
+import com.halimjr11.beacon.model.SourceArticlesKey
+import com.halimjr11.beacon.model.SourcesKey
+import com.halimjr11.beacon.model.TopLevelKeys
 import com.halimjr11.beacon.sources.CategorySourcesScreen
 import com.halimjr11.beacon.sources.SourcesScreen
+import com.halimjr11.beacon.ui.theme.BeaconIcons
 
 /**
  * Navigation 3 host. Feature screens only receive callbacks; the keys live here.
@@ -44,12 +49,11 @@ fun BeaconNavHost() {
     fun selectTab(key: NavKey) {
         if (current == key) return
         backStack.clear()
-        backStack.add(HomeKey) // Back from any tab returns to Home, then exits.
+        backStack.add(HomeKey)
         if (key != HomeKey) backStack.add(key)
     }
 
     Scaffold(
-        // Screens own their top bars and insets; only the bottom bar's height is applied here.
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
             if (current in TopLevelKeys) {
@@ -82,10 +86,17 @@ fun BeaconNavHost() {
                     GenresScreen(onCategoryClick = { backStack.add(CategorySourcesKey(it.apiValue)) })
                 }
                 entry<SourcesKey> {
-                    SourcesScreen(onSourceClick = { id, name -> backStack.add(SourceArticlesKey(id, name)) })
+                    SourcesScreen(onSourceClick = { id, name ->
+                        backStack.add(
+                            SourceArticlesKey(
+                                id,
+                                name
+                            )
+                        )
+                    })
                 }
                 entry<CategorySourcesKey> { key ->
-                    val category = NewsCategory.entries.first { it.apiValue == key.category }
+                    val category = NewsCategory.fromApiValue(key.category) ?: NewsCategory.General
                     CategorySourcesScreen(
                         category = category,
                         onBack = { backStack.removeLastOrNull() },
@@ -94,7 +105,7 @@ fun BeaconNavHost() {
                     )
                 }
                 entry<CategoryArticlesKey> { key ->
-                    val category = NewsCategory.entries.first { it.apiValue == key.category }
+                    val category = NewsCategory.fromApiValue(key.category) ?: NewsCategory.General
                     ArticlesScreen(
                         feed = NewsFeed.Category(category),
                         title = category.displayName,
@@ -111,7 +122,10 @@ fun BeaconNavHost() {
                     )
                 }
                 entry<ArticleWebKey> { key ->
-                    ArticleWebScreen(url = key.url, title = key.title, onBack = { backStack.removeLastOrNull() })
+                    ArticleWebScreen(
+                        url = key.url,
+                        title = key.title,
+                        onBack = { backStack.removeLastOrNull() })
                 }
             },
         )
@@ -119,9 +133,9 @@ fun BeaconNavHost() {
 }
 
 private fun NavKey.icon(): ImageVector = when (this) {
-    GenresKey -> Icons.Outlined.Category
-    SourcesKey -> Icons.Outlined.Newspaper
-    else -> Icons.Outlined.Home
+    GenresKey -> BeaconIcons.Genres
+    SourcesKey -> BeaconIcons.Sources
+    else -> BeaconIcons.Home
 }
 
 private fun NavKey.label(): Int = when (this) {
