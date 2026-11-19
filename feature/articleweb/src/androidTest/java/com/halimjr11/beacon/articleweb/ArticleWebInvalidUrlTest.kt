@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.articleweb
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -16,7 +16,8 @@ import org.junit.runners.Parameterized
 /** AC 4.3 and 4.5: an unusable url shows an error and never creates a WebView; Back still works. */
 @RunWith(Parameterized::class)
 class ArticleWebInvalidUrlTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val url: String,
 ) {
     @get:Rule

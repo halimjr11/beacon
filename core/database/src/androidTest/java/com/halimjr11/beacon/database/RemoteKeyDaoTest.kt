@@ -30,7 +30,8 @@ class RemoteKeyDaoTest : DatabaseTest() {
 /** Retention: which keys survive `deleteOlderThan(100)`. */
 @RunWith(Parameterized::class)
 class RemoteKeyRetentionTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val fetchedAt: Long,
     private val survives: Boolean,
 ) : DatabaseTest() {

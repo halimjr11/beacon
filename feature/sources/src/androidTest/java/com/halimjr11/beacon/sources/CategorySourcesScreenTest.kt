@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.sources
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -32,15 +32,18 @@ class CategorySourcesScreenTest(private val category: NewsCategory) {
     private var backs = 0
     private var headlines = 0
 
-    private fun show() = rule.setContent {
-        BeaconTheme {
-            CategorySourcesScreen(
-                category = category,
-                onBack = { backs++ },
-                onSourceClick = { id, name -> sourceClicks += id to name },
-                onTopHeadlinesClick = { headlines++ },
-                viewModel = SourcesViewModel(GetSourcesUseCase(repo), initialCategory = category),
-            )
+    private fun show() {
+        val viewModel = SourcesViewModel(GetSourcesUseCase(repo), initialCategory = category)
+        rule.setContent {
+            BeaconTheme {
+                CategorySourcesScreen(
+                    category = category,
+                    onBack = { backs++ },
+                    onSourceClick = { id, name -> sourceClicks += id to name },
+                    onTopHeadlinesClick = { headlines++ },
+                    viewModel = viewModel,
+                )
+            }
         }
     }
 

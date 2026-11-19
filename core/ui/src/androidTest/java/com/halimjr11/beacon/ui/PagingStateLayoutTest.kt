@@ -2,7 +2,7 @@ package com.halimjr11.beacon.ui
 
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.paging.LoadState
 import androidx.paging.LoadStates
@@ -24,7 +24,8 @@ import org.junit.runners.Parameterized
  */
 @RunWith(Parameterized::class)
 class PagingStateLayoutTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val items: List<String>,
     private val refresh: LoadState,
     private val shown: List<Any>,

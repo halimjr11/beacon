@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.paging.LoadState
@@ -18,7 +18,8 @@ import org.junit.runners.Parameterized
 /** AC 3.4 and 6.2: footer error with Retry, except where retrying cannot help (rate limit). */
 @RunWith(Parameterized::class)
 class PagingFooterTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val state: LoadState,
     private val errorText: Boolean,
     private val retryShown: Boolean,

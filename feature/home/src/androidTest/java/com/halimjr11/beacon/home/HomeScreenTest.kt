@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.home
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -18,7 +18,8 @@ import org.junit.runners.Parameterized
 /** AC 9.1 / 9.4: highlights always, "Latest" only when more than 5 headlines exist. */
 @RunWith(Parameterized::class)
 class HomeScreenTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val count: Int,
     private val latestShown: Boolean,
 ) {
@@ -30,10 +31,11 @@ class HomeScreenTest(
 
     private fun show(count: Int) {
         val repo = FakeNewsRepository(articles = (1..count).map { article(it) })
+        val viewModel = HomeViewModel(GetArticlesUseCase(repo))
         rule.mainClock.autoAdvance = false // the carousel auto-scrolls; the test drives the clock
         rule.setContent {
             BeaconTheme {
-                HomeScreen(onArticleClick = { clicked += it }, viewModel = HomeViewModel(GetArticlesUseCase(repo)))
+                HomeScreen(onArticleClick = { clicked += it }, viewModel = viewModel)
             }
         }
         rule.mainClock.advanceTimeBy(500)

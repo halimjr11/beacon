@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.sources
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
@@ -31,12 +31,16 @@ class SourcesScreenTest {
     )
     private val clicked = mutableListOf<Pair<String, String>>()
 
-    private fun show() = rule.setContent {
-        BeaconTheme {
-            SourcesScreen(
-                onSourceClick = { id, name -> clicked += id to name },
-                viewModel = SourcesViewModel(GetSourcesUseCase(repo)),
-            )
+    private fun show() {
+        // Built outside the composable: a ViewModel must not be constructed during composition.
+        val viewModel = SourcesViewModel(GetSourcesUseCase(repo))
+        rule.setContent {
+            BeaconTheme {
+                SourcesScreen(
+                    onSourceClick = { id, name -> clicked += id to name },
+                    viewModel = viewModel,
+                )
+            }
         }
     }
 

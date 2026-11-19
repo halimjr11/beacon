@@ -9,7 +9,8 @@ import org.junit.runners.Parameterized
 /** The LIKE search used by the Sources tab (AC 5.1): case-insensitive, name or description, wildcards escaped. */
 @RunWith(Parameterized::class)
 class SourceDaoSearchTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val pattern: String,
     private val expectedIds: List<String>,
 ) : DatabaseTest() {

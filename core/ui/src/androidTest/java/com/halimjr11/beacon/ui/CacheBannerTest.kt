@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import com.halimjr11.beacon.common.NewsError
 import com.halimjr11.beacon.ui.component.CacheBanner
@@ -14,7 +14,8 @@ import org.junit.runners.Parameterized
 /** AC 8.2 and 8.5: saved data stays visible; the banner says why the refresh failed. */
 @RunWith(Parameterized::class)
 class CacheBannerTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val error: NewsError,
     private val message: Int,
 ) {

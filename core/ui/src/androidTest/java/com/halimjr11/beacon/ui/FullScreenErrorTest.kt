@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.halimjr11.beacon.common.NewsError
@@ -16,7 +16,8 @@ import org.junit.runners.Parameterized
 /** PRD FR-07: message per error type, and Retry only where retrying can help. */
 @RunWith(Parameterized::class)
 class FullScreenErrorTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val error: NewsError,
     private val message: Int,
     private val retryShown: Boolean,

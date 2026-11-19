@@ -2,7 +2,7 @@ package com.halimjr11.beacon.articles
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -25,15 +25,19 @@ class ArticlesScreenTest {
     private val clicked = mutableListOf<Article>()
     private var backs = 0
 
-    private fun show(feed: NewsFeed = NewsFeed.Source("bbc-news"), title: String = "BBC News") = rule.setContent {
-        BeaconTheme {
-            ArticlesScreen(
-                feed = feed,
-                title = title,
-                onBack = { backs++ },
-                onArticleClick = { clicked += it },
-                viewModel = ArticlesViewModel(feed, GetArticlesUseCase(repo)),
-            )
+    private fun show(feed: NewsFeed = NewsFeed.Source("bbc-news"), title: String = "BBC News") {
+        // Built outside the composable: a ViewModel must not be constructed during composition.
+        val viewModel = ArticlesViewModel(feed, GetArticlesUseCase(repo))
+        rule.setContent {
+            BeaconTheme {
+                ArticlesScreen(
+                    feed = feed,
+                    title = title,
+                    onBack = { backs++ },
+                    onArticleClick = { clicked += it },
+                    viewModel = viewModel,
+                )
+            }
         }
     }
 

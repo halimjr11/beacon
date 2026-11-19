@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.home
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -20,10 +20,11 @@ class HomeLatestAndCarouselTest {
 
     private fun show(count: Int) {
         val repo = FakeNewsRepository(articles = (1..count).map { article(it) })
+        val viewModel = HomeViewModel(GetArticlesUseCase(repo))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             BeaconTheme {
-                HomeScreen(onArticleClick = { clicked += it }, viewModel = HomeViewModel(GetArticlesUseCase(repo)))
+                HomeScreen(onArticleClick = { clicked += it }, viewModel = viewModel)
             }
         }
         rule.mainClock.advanceTimeBy(500)
@@ -54,7 +55,8 @@ class HomeLatestAndCarouselTest {
     @Test
     fun carouselWrapsAroundToTheFirstItem() {
         show(8)
-        repeat(5) { rule.mainClock.advanceTimeBy(4_200); rule.waitForIdle() }
+        // One step = 4 s delay + the scroll animation, so allow 5 s per step; 5 steps wrap to page 0.
+        repeat(5) { rule.mainClock.advanceTimeBy(5_000); rule.waitForIdle() }
         rule.onNodeWithText("Headline 1").assertIsDisplayed()
     }
 }

@@ -1,6 +1,6 @@
 package com.halimjr11.beacon.articles
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
@@ -19,7 +19,8 @@ import org.junit.runners.Parameterized
  */
 @RunWith(Parameterized::class)
 class ArticlesSearchTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val typed: String,
     private val expectedQueries: List<String>,
 ) {
@@ -30,9 +31,10 @@ class ArticlesSearchTest(
     fun requestedQueriesMatchTheRules() {
         val repo = FakeNewsRepository(articles = (1..3).map { article(it) })
         val feed = NewsFeed.Source("bbc-news")
+        val viewModel = ArticlesViewModel(feed, GetArticlesUseCase(repo))
         rule.setContent {
             BeaconTheme {
-                ArticlesScreen(feed, "BBC", onBack = {}, onArticleClick = {}, viewModel = ArticlesViewModel(feed, GetArticlesUseCase(repo)))
+                ArticlesScreen(feed, "BBC", onBack = {}, onArticleClick = {}, viewModel = viewModel)
             }
         }
         rule.waitUntil(3_000) { repo.articleQueries.isNotEmpty() }

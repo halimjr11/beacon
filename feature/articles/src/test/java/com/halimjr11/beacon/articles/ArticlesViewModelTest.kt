@@ -33,8 +33,10 @@ class ArticlesViewModelTest {
     private val repository = mockk<NewsRepository>()
     private val feed = NewsFeed.Source("bbc-news")
 
-    @BeforeEach fun setUp() { every { repository.articles(any(), any()) } returns flowOf(PagingData.empty<Article>()) }
-    @AfterEach fun tearDown() = Dispatchers.resetMain()
+    @BeforeEach
+    fun setUp() { every { repository.articles(any(), any()) } returns flowOf(PagingData.empty<Article>()) }
+    @AfterEach
+    fun tearDown() = Dispatchers.resetMain()
 
     @Test
     fun `search waits 500 ms and only the last query is requested`() = runTest {

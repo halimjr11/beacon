@@ -1,7 +1,7 @@
 package com.halimjr11.beacon.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.halimjr11.beacon.ui.component.ArticleCard
@@ -14,7 +14,8 @@ import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class ArticleCardTest(
-    @Suppress("unused") private val caseName: String,
+    @Suppress("unused")
+    private val caseName: String,
     private val source: String,
     private val date: String,
     private val description: String,
