@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.halimjr11.beacon.ui.theme.BeaconIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled") // News sites need JavaScript; file/content access stay off.
@@ -54,8 +52,10 @@ fun ArticleWebScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val target = remember(url) { WebUrlPolicy.resolve(url) }
-    val external = remember(url) { WebUrlPolicy.external(url) }
+    // Explicit types: both are nullable (null = unusable url). Without them, analyzers that cannot
+    // resolve Compose's generic `remember` infer a non-null type and flag the null checks below.
+    val target: String? = remember(url) { WebUrlPolicy.resolve(url) }
+    val external: String? = remember(url) { WebUrlPolicy.external(url) }
     var progress by remember { mutableFloatStateOf(0f) }
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
@@ -66,7 +66,6 @@ fun ArticleWebScreen(
         external?.let { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
     }
 
-    // System Back walks the web history first (AC 4.6).
     BackHandler(enabled = canGoBack && !failed) { webView?.goBack() }
 
     Scaffold(
@@ -76,13 +75,13 @@ fun ArticleWebScreen(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.web_back))
+                        Icon(BeaconIcons.Back, contentDescription = stringResource(R.string.web_back))
                     }
                 },
                 actions = {
                     if (external != null) {
                         IconButton(onClick = ::openExternal) {
-                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.web_open_in_browser))
+                            Icon(BeaconIcons.OpenInBrowser, contentDescription = stringResource(R.string.web_open_in_browser))
                         }
                     }
                 },

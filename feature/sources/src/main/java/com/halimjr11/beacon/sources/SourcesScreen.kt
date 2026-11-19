@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -36,6 +33,7 @@ import com.halimjr11.beacon.domain.model.NewsSource
 import com.halimjr11.beacon.ui.component.PagingFooter
 import com.halimjr11.beacon.ui.component.PagingStateLayout
 import com.halimjr11.beacon.ui.component.SearchField
+import com.halimjr11.beacon.ui.theme.BeaconIcons
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -101,7 +99,7 @@ fun CategorySourcesScreen(
                 title = { Text(category.displayName) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.sources_back))
+                        Icon(BeaconIcons.Back, contentDescription = stringResource(R.string.sources_back))
                     }
                 },
             )
@@ -112,7 +110,7 @@ fun CategorySourcesScreen(
             AssistChip(
                 onClick = onTopHeadlinesClick,
                 label = { Text(stringResource(R.string.sources_top_headlines)) },
-                leadingIcon = { Icon(Icons.Outlined.Newspaper, contentDescription = null) },
+                leadingIcon = { Icon(BeaconIcons.TopHeadlines, contentDescription = null) },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             SourcesList(items, query, onSourceClick)

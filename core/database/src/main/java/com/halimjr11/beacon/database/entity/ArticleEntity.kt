@@ -10,7 +10,8 @@ import androidx.room3.PrimaryKey
     indices = [Index(value = ["feedId", "queryKey", "url"], unique = true)],
 )
 data class ArticleEntity(
-    @PrimaryKey(autoGenerate = true) val rowId: Long = 0,
+    @PrimaryKey(autoGenerate = true)
+    val rowId: Long = 0,
     val feedId: String,
     val queryKey: String,
     val url: String,

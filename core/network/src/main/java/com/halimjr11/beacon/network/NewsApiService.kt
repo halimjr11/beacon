@@ -9,19 +9,27 @@ interface NewsApiService {
 
     @GET("top-headlines/sources")
     suspend fun getSources(
-        @Query("category") category: String?,
-        @Query("language") language: String? = "en",
+        @Query("category")
+        category: String?,
+        @Query("language")
+        language: String? = "en",
     ): SourcesResponseDto
 
     @GET("top-headlines")
     suspend fun getTopHeadlines(
         // All optional: null makes Retrofit omit the parameter. NewsAPI forbids mixing
         // `sources` with `country`/`category`; callers pass one group only.
-        @Query("sources") sources: String?,
-        @Query("category") category: String?,
-        @Query("country") country: String?,
-        @Query("q") query: String?,
-        @Query("page") page: Int,
-        @Query("pageSize") pageSize: Int,
+        @Query("sources")
+        sources: String?,
+        @Query("category")
+        category: String?,
+        @Query("country")
+        country: String?,
+        @Query("q")
+        query: String?,
+        @Query("page")
+        page: Int,
+        @Query("pageSize")
+        pageSize: Int,
     ): ArticlesResponseDto
 }

@@ -25,9 +25,11 @@ import com.halimjr11.beacon.domain.repository.NewsRepository
 import com.halimjr11.beacon.network.NewsApiService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.koin.core.annotation.Single
 
 /** Room is the source of truth; the mediators only refresh it from the API. */
 @OptIn(ExperimentalPagingApi::class)
+@Single(binds = [NewsRepository::class])
 class NewsRepositoryImpl(
     private val api: NewsApiService,
     private val sourceDao: SourceDao,

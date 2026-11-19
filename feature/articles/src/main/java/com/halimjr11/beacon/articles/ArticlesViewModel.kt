@@ -16,13 +16,17 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import org.koin.android.annotation.KoinViewModel
+import org.koin.core.annotation.InjectedParam
 
 internal const val SEARCH_DEBOUNCE_MS = 500L
 internal const val MIN_QUERY_LENGTH = 2
 
 /** Article list of one [feed] (genre or source) with API search: debounce, min length, cancel stale. */
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+@KoinViewModel
 class ArticlesViewModel(
+    @InjectedParam
     private val feed: NewsFeed,
     getArticles: GetArticlesUseCase,
 ) : ViewModel() {

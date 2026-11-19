@@ -1,13 +1,9 @@
 package com.halimjr11.beacon.sources
 
-import com.halimjr11.beacon.domain.model.NewsCategory
-import org.koin.core.module.dsl.viewModel
-import org.koin.dsl.module
+import org.koin.core.annotation.ComponentScan
+import org.koin.core.annotation.Module
 
-val sourcesModule = module {
-    // The Sources tab starts the ViewModel with no parameter (General); the screen of one genre
-    // passes parametersOf(category).
-    viewModel { params ->
-        SourcesViewModel(getSources = get(), initialCategory = params.getOrNull<NewsCategory>() ?: NewsCategory.General)
-    }
-}
+/** Picks up the @KoinViewModel classes of this feature. */
+@Module
+@ComponentScan
+class SourcesModule

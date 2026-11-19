@@ -13,14 +13,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import org.koin.android.annotation.KoinViewModel
+import org.koin.core.annotation.InjectedParam
 
 /** Category chip and search text live here so they survive rotation (AC 5.3). Search is local (Room LIKE), so no debounce. */
 @OptIn(ExperimentalCoroutinesApi::class)
+/** The Sources tab passes no parameter (General); a genre screen passes `parametersOf(category)`. */
+@KoinViewModel
 class SourcesViewModel(
     getSources: GetSourcesUseCase,
-    initialCategory: NewsCategory = NewsCategory.General,
+    @InjectedParam
+    initialCategory: NewsCategory? = null,
 ) : ViewModel() {
-    private val _category = MutableStateFlow(initialCategory)
+    private val _category = MutableStateFlow(initialCategory ?: NewsCategory.General)
     private val _query = MutableStateFlow("")
 
     val category: StateFlow<NewsCategory> = _category

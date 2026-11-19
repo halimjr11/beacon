@@ -2,8 +2,10 @@ package com.halimjr11.beacon.data.cache
 
 import com.halimjr11.beacon.database.dao.ArticleDao
 import com.halimjr11.beacon.database.dao.RemoteKeyDao
+import org.koin.core.annotation.Single
 
 /** Drops keys older than 7 days, the articles they owned, and rows beyond the cap. */
+@Single
 class CacheRetention(
     private val articleDao: ArticleDao,
     private val keyDao: RemoteKeyDao,

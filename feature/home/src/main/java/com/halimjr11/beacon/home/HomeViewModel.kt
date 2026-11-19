@@ -8,7 +8,9 @@ import com.halimjr11.beacon.domain.model.Article
 import com.halimjr11.beacon.domain.model.NewsFeed
 import com.halimjr11.beacon.domain.usecase.GetArticlesUseCase
 import kotlinx.coroutines.flow.Flow
+import org.koin.android.annotation.KoinViewModel
 
+@KoinViewModel
 class HomeViewModel(getArticles: GetArticlesUseCase) : ViewModel() {
     /** One headline list: the first items feed the carousel, the rest the "Latest" list. */
     val headlines: Flow<PagingData<Article>> =

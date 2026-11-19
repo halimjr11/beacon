@@ -9,7 +9,8 @@ import androidx.room3.PrimaryKey
  */
 @Entity(tableName = "remote_keys")
 data class RemoteKeyEntity(
-    @PrimaryKey val key: String,
+    @PrimaryKey
+    val key: String,
     val nextPage: Int?,
     val fetchedAt: Long,
 )
