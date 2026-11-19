@@ -20,17 +20,18 @@ import com.halimjr11.beacon.ui.R
 @Composable
 fun RemoteImage(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
     val description = stringResource(R.string.image_placeholder)
-    if (url.isBlank()) {
-        Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+    // The tint stays visible while the image loads, when the url is blank, and if loading fails.
+    Box(modifier.background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+        if (url.isBlank()) {
             Icon(Icons.Outlined.BrokenImage, contentDescription = description)
+        } else {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale,
+                error = rememberVectorPainter(Icons.Outlined.BrokenImage),
+            )
         }
-    } else {
-        AsyncImage(
-            model = url,
-            contentDescription = null,
-            modifier = modifier,
-            contentScale = contentScale,
-            error = rememberVectorPainter(Icons.Outlined.BrokenImage),
-        )
     }
 }

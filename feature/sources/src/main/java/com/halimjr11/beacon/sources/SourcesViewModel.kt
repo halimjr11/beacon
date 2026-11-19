@@ -16,8 +16,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 
 /** Category chip and search text live here so they survive rotation (AC 5.3). Search is local (Room LIKE), so no debounce. */
 @OptIn(ExperimentalCoroutinesApi::class)
-class SourcesViewModel(getSources: GetSourcesUseCase) : ViewModel() {
-    private val _category = MutableStateFlow(NewsCategory.General)
+class SourcesViewModel(
+    getSources: GetSourcesUseCase,
+    initialCategory: NewsCategory = NewsCategory.General,
+) : ViewModel() {
+    private val _category = MutableStateFlow(initialCategory)
     private val _query = MutableStateFlow("")
 
     val category: StateFlow<NewsCategory> = _category

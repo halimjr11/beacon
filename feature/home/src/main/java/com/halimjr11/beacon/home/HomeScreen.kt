@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
@@ -19,12 +22,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -33,9 +40,12 @@ import com.halimjr11.beacon.ui.component.ArticleCard
 import com.halimjr11.beacon.ui.component.HeroArticleCard
 import com.halimjr11.beacon.ui.component.PagingFooter
 import com.halimjr11.beacon.ui.component.PagingStateLayout
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 
 private const val HERO_COUNT = 5
+private const val AUTO_SCROLL_MS = 4_000L
+private val HERO_MAX_HEIGHT = 300.dp
 
 /** Home: a highlight carousel (top headlines) followed by the latest headlines. Offline-first. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +85,7 @@ private fun HomeContent(items: LazyPagingItems<Article>, onArticleClick: (Articl
         }
         item(key = "carousel") {
             val pager = rememberPagerState { heroes.size }
+            AutoScroll(pager, pageCount = heroes.size)
             Box {
                 HorizontalPager(pager, pageSpacing = 12.dp) { page ->
                     val article = heroes[page]
@@ -83,6 +94,8 @@ private fun HomeContent(items: LazyPagingItems<Article>, onArticleClick: (Articl
                         sourceName = article.sourceName,
                         imageUrl = article.imageUrl,
                         onClick = { onArticleClick(article) },
+                        // Landscape: keep the carousel a banner instead of filling the screen.
+                        modifier = Modifier.heightIn(max = HERO_MAX_HEIGHT),
                     )
                 }
                 PagerDots(count = heroes.size, current = pager.currentPage, modifier = Modifier.align(Alignment.TopEnd))
@@ -111,6 +124,25 @@ private fun HomeContent(items: LazyPagingItems<Article>, onArticleClick: (Articl
         }
         item(key = "footer") {
             PagingFooter(items.loadState.append, onRetry = { items.retry() })
+        }
+    }
+}
+
+/**
+ * Advances the carousel every [AUTO_SCROLL_MS] while the screen is visible. A finger on the pager
+ * pauses it; the timer restarts from zero after the drag ends.
+ */
+@Composable
+private fun AutoScroll(pager: PagerState, pageCount: Int) {
+    val dragged by pager.interactionSource.collectIsDraggedAsState()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(pager, pageCount, dragged) {
+        if (dragged || pageCount < 2) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                delay(AUTO_SCROLL_MS)
+                pager.animateScrollToPage((pager.currentPage + 1) % pageCount)
+            }
         }
     }
 }

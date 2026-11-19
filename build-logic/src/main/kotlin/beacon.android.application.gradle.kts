@@ -14,6 +14,7 @@ android {
         applicationId = BeaconBuild.NAMESPACE_ROOT
         minSdk = BeaconBuild.MIN_SDK
         targetSdk = BeaconBuild.TARGET_SDK
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -34,4 +35,10 @@ dependencies {
     "implementation"(platform(catalog.lib("androidx-compose-bom").get()))
     "implementation"(catalog.bundle("compose"))
     "testImplementation"(catalog.bundle("unit-test"))
+
+    "androidTestImplementation"(catalog.lib("androidx-junit"))
+    "androidTestImplementation"(catalog.lib("androidx-espresso-core"))
+    "androidTestImplementation"(platform(catalog.lib("androidx-compose-bom").get()))
+    "androidTestImplementation"(catalog.lib("androidx-compose-ui-test-junit4"))
+    "debugImplementation"(catalog.lib("androidx-compose-ui-test-manifest"))
 }

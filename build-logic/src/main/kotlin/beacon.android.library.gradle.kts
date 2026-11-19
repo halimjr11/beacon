@@ -10,6 +10,7 @@ android {
     }
     defaultConfig {
         minSdk = BeaconBuild.MIN_SDK
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -26,4 +27,9 @@ tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 dependencies {
     "testImplementation"(catalog.bundle("unit-test"))
+
+    // Instrumented tests (src/androidTest) run on JUnit 4 with AndroidX Test + Espresso.
+    "androidTestImplementation"(catalog.lib("androidx-junit"))
+    "androidTestImplementation"(catalog.lib("androidx-espresso-core"))
+    "androidTestImplementation"(catalog.lib("kotlinx-coroutines-test"))
 }

@@ -38,7 +38,7 @@ fun HeroArticleCard(
         RemoteImage(url = imageUrl, modifier = Modifier.matchParentSize())
         Box(
             Modifier.matchParentSize().background(
-                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)), startY = 120f),
+                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f), Color.Black.copy(alpha = 0.85f))),
             ),
         )
         Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {

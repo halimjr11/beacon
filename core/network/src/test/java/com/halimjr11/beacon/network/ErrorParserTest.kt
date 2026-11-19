@@ -30,6 +30,7 @@ class ErrorParserTest {
             argumentSet("sourcesTooMany", 400, body("sourcesTooMany"), NewsError.BadRequest("sourcesTooMany")),
             argumentSet("parameterInvalid", 400, body("parameterInvalid"), NewsError.BadRequest("parameterInvalid")),
             argumentSet("parametersMissing", 400, body("parametersMissing"), NewsError.BadRequest("parametersMissing")),
+            argumentSet("parametersIncompatible", 400, body("parametersIncompatible"), NewsError.BadRequest("parametersIncompatible")),
             argumentSet("unexpectedError", 500, body("unexpectedError"), NewsError.Server),
             argumentSet("max results", 426, body("maximumResultsReached"), NewsError.EndOfResults),
             argumentSet("unknown code", 400, body("zzz"), NewsError.Unknown("zzz")),

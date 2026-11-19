@@ -3,7 +3,7 @@
 # 🔦 Beacon
 
 **Aplikasi berita Android native berbasis NewsAPI**
-Home (highlight) · Genres · Sources → Artikel → Detail (web view)
+Home (highlight) · Genres → Sumber → Artikel · Sources → Artikel → Detail (web view)
 
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4.x-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
@@ -20,7 +20,7 @@ Home (highlight) · Genres · Sources → Artikel → Detail (web view)
 | | Fitur | Detail |
 |---|---|---|
 | 🏠 | **Home** | Carousel highlight + daftar headline terbaru, pull-to-refresh |
-| 🗂️ | **Genres** | Tujuh genre resmi NewsAPI (statis), tap untuk headline genre |
+| 🗂️ | **Genres** | Tujuh genre resmi NewsAPI (statis); tap genre → sumber genre itu → artikel; chip "Top headlines" untuk headline genre |
 | 📰 | **Sources** | Tab terpisah: chip kategori + pencarian, daftar sumber per kategori, endless scrolling dari Room (diisi sekali per kategori, TTL 24 jam) |
 | 🧾 | **Artikel** | Artikel per sumber, endless scrolling (Paging 3 + `RemoteMediator`, TTL 1 jam) |
 | 📴 | **Offline-first** | Room sebagai sumber kebenaran; daftar tetap tampil saat offline dengan banner, hemat kuota API |
@@ -33,8 +33,10 @@ Home (highlight) · Genres · Sources → Artikel → Detail (web view)
 ```mermaid
 graph LR
     H[Home] --> W[Article WebView]
-    G[Genres] --> A[Articles + search]
-    S[Sources + search] --> A
+    G[Genres] --> GS[Sources of genre]
+    GS --> A[Articles + search]
+    GS -- Top headlines --> A
+    S[Sources tab + search] --> A
     A --> W
 ```
 
@@ -67,8 +69,11 @@ Namespace: `com.halimjr11.beacon`.
 3. Build dan jalankan:
    ```bash
    ./gradlew assembleDebug
-   ./gradlew testDebugUnitTest
+   ./gradlew testDebugUnitTest                      # 153 unit test (JUnit 5)
+   ./gradlew :core:database:connectedDebugAndroidTest   # instrumented (emulator/perangkat), tiap modul punya src/androidTest
    ```
+
+**Tanpa API key (QA/mock):** jalankan `python3 docs/mock/mock_server.py`, isi `NEWS_API_KEY=mock` dan `NEWS_API_BASE_URL=http://localhost:8099/v2/` di `local.properties`, lalu `adb reverse tcp:8099 tcp:8099`. Hanya build debug yang membaca base URL ini.
 
 > ⚠️ Paket **Developer** NewsAPI: 100 request/hari, artikel tertunda 24 jam, hanya untuk development/testing. Rilis publik membutuhkan paket berbayar.
 
@@ -88,7 +93,7 @@ Namespace: `com.halimjr11.beacon`.
 - [x] Offline-first fase 1: Room + mediator sumber
 - [x] Offline-first fase 2 (data): mediator artikel, retensi (`CacheRetention`)
 - [ ] Offline-first fase 2 (UI): banner offline di layar, panggil `CacheRetention.purge()` saat start
-- [x] Layar Home, Genres, Sources, artikel, dan web view (belum dicoba di perangkat)
-- [ ] Verifikasi di emulator dengan `NEWS_API_KEY` asli
+- [x] Layar Home, Genres, Sources, artikel, dan web view (smoke test di emulator dengan server tiruan)
+- [ ] Verifikasi dengan `NEWS_API_KEY` asli
 - [ ] Unit test dan QA manual
-- [ ] Compose UI test dan instrumented test (menyusul)
+- [x] Unit test berparameter (JUnit 5) dan instrumented test (Room, Compose UI, Espresso, 134 tes)

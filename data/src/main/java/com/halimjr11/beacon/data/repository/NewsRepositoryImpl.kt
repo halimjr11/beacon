@@ -37,7 +37,14 @@ class NewsRepositoryImpl(
     private val clock: Clock,
 ) : NewsRepository {
 
-    private val config = PagingConfig(pageSize = CacheConfig.PAGE_SIZE, enablePlaceholders = false)
+    // initialLoadSize defaults to 3 pages, which made the first open fetch 3 API pages (3 requests of a
+    // 100/day quota). One page up front, and fetch the next one only when the user nears the end.
+    private val config = PagingConfig(
+        pageSize = CacheConfig.PAGE_SIZE,
+        initialLoadSize = CacheConfig.PAGE_SIZE,
+        prefetchDistance = CacheConfig.PREFETCH_DISTANCE,
+        enablePlaceholders = false,
+    )
 
     override fun sources(category: NewsCategory, query: String): Flow<PagingData<NewsSource>> = Pager(
         config = config,

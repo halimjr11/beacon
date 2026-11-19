@@ -20,6 +20,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.Arguments.argumentSet
+import org.junit.jupiter.params.provider.MethodSource
+import java.util.stream.Stream
 import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,5 +71,35 @@ class ArticlesViewModelTest {
         verify(exactly = 2) { repository.articles(feed, "") }
         verify(exactly = 0) { repository.articles(feed, "e") }
         job.cancel()
+    }
+
+    @ParameterizedTest
+    @MethodSource("typedCases")
+    fun `typed text decides which queries reach the repository`(typed: String, expected: List<String>) = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val requested = mutableListOf<String>()
+        every { repository.articles(any(), any()) } answers { requested += secondArg<String>(); flowOf(PagingData.empty<Article>()) }
+        val vm = ArticlesViewModel(feed, GetArticlesUseCase(repository))
+        val job = backgroundScope.launch { vm.articles.collect { } }
+        runCurrent()
+
+        vm.onQueryChange(typed)
+        advanceTimeBy(700); runCurrent()
+
+        assertEquals(expected, requested)
+        job.cancel()
+    }
+
+    companion object {
+        @JvmStatic
+        fun typedCases(): Stream<Arguments> = Stream.of(
+            argumentSet("one character", "a", listOf("")),
+            argumentSet("two characters", "ab", listOf("", "ab")),
+            argumentSet("padded", "  ab  ", listOf("", "ab")),
+            argumentSet("only spaces", "    ", listOf("")),
+            argumentSet("one character plus spaces", " a ", listOf("")),
+            argumentSet("a word", "election", listOf("", "election")),
+            argumentSet("kept case", "Election", listOf("", "Election")),
+        )
     }
 }

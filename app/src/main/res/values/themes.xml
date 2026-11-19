@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Window only; the UI is drawn by BeaconTheme (Compose). -->
-    <style name="Theme.Beacon" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Beacon" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Same as the Compose background, so a cold start does not flash black. -->
+        <item name="android:windowBackground">#FFF8FAFC</item>
+    </style>
 </resources>

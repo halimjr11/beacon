@@ -7,4 +7,9 @@ plugins {
 dependencies {
     "implementation"(platform(catalog.lib("androidx-compose-bom").get()))
     "implementation"(catalog.bundle("compose"))
+
+    // Compose UI tests: createComposeRule + the manifest that hosts ComponentActivity.
+    "androidTestImplementation"(platform(catalog.lib("androidx-compose-bom").get()))
+    "androidTestImplementation"(catalog.lib("androidx-compose-ui-test-junit4"))
+    "debugImplementation"(catalog.lib("androidx-compose-ui-test-manifest"))
 }

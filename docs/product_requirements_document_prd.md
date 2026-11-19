@@ -31,9 +31,12 @@ Bottom navigation (Home | Genres | Sources); Back dari tab mana pun kembali ke H
 [HomeScreen] ── carousel highlight + daftar "Latest" (pull-to-refresh)
        │  tap artikel
        ▼
-[GenresScreen] ── tap genre ──► [ArticlesScreen (genre)] ──┐
+[GenresScreen] ── tap genre ──► [SourcesScreen (genre)] ── tap sumber ──┐
+                                      │ chip "Top headlines"            │
+                                      ▼                                 │
+                        [ArticlesScreen (genre)] ─────────┤
                                                           │ tap artikel (url, title)
-[SourcesScreen] ── chip kategori + search ── tap sumber ──► [ArticlesScreen (sumber)] ──┤
+[SourcesScreen (tab)] ── chip kategori + search ── tap sumber ──► [ArticlesScreen (sumber)] ──┤
                                                           ▼
                                                 [ArticleWebScreen] (WebView + progress + error/retry)
                                                           │
@@ -65,9 +68,10 @@ Bottom bar hanya tampil di tiga tab; layar artikel dan detail menyembunyikannya.
 * **UI/UX Behavior:**
   * `TopAppBar` berjudul **"Genres"**; grid 2 kolom kartu dengan ikon dan nama. Urutan tetap seperti di atas.
   * Genre bersifat **statis** (bukan hasil API), jadi tidak ada loading maupun error.
-  * Tap genre membuka `ArticlesScreen` berisi headline genre itu (`top-headlines?category=…`), dengan pencarian dan *endless scrolling* (FR-03, FR-05).
+  * Tap genre membuka **daftar sumber genre itu** (alur US2: Genre → Sumber → Artikel). Layar ini punya tombol back, pencarian lokal, dan chip **"Top headlines"** yang membuka headline genre itu (`top-headlines?category=…`, FR-03).
 * **Acceptance Criteria:**
-  * **AC 1.1 (Positive):** Tujuh genre tampil, dapat diklik, dan membuka daftar artikel genre itu dengan judul nama genre.
+  * **AC 1.1 (Positive):** Tujuh genre tampil, dapat diklik, dan membuka daftar sumber genre itu dengan judul nama genre dan hanya berisi sumber genre itu (tanpa chip kategori).
+  * **AC 1.3 (Top headlines):** Chip "Top headlines" membuka daftar artikel genre; Back dari sana kembali ke daftar sumber, lalu ke Genres.
   * **AC 1.2 (Offline-safe):** Layar tetap tampil penuh walau perangkat offline.
 
 ### FR-02: Sumber Berita per Kategori (US2, US6)
@@ -170,7 +174,7 @@ Bottom bar hanya tampil di tiga tab; layar artikel dan detail menyembunyikannya.
 ### FR-09: Home & Highlight (US8)
 * **Deskripsi:** Tab **Home** (start destination) menampilkan headline terbaru dari satu feed `top-headlines?country=us`.
 * **UI/UX Behavior:**
-  * `TopAppBar` **"Beacon"**; bagian **Highlights**: carousel horizontal 5 headline teratas (gambar penuh, judul 3 baris di atas scrim, nama sumber) dengan indikator halaman.
+  * `TopAppBar` **"Beacon"**; bagian **Highlights**: carousel horizontal 5 headline teratas (gambar penuh, judul 3 baris di atas scrim, nama sumber) dengan indikator halaman. Carousel **berpindah otomatis tiap 4 detik** (berhenti saat disentuh atau layar tidak terlihat; timer mulai ulang setelah sentuhan selesai). Tinggi maksimum 300 dp agar tetap berupa banner di landscape.
   * Bagian **Latest**: kartu artikel (FR-03) untuk item berikutnya, *endless scrolling*.
   * Tap carousel atau kartu membuka `ArticleWebScreen` langsung.
   * Tarik ke bawah (*pull-to-refresh*) menyegarkan feed (tindakan pengguna, menghabiskan kuota).
@@ -178,6 +182,7 @@ Bottom bar hanya tampil di tiga tab; layar artikel dan detail menyembunyikannya.
   * **AC 9.1 (Positive):** Carousel dan daftar tampil; urutan sama dengan API.
   * **AC 9.2 (Offline-first):** Cache masih segar (< 1 jam) tidak memanggil API; offline dengan cache menampilkan data + banner (AC 8.2); tanpa cache tampil error + Retry.
   * **AC 9.3 (Dedup):** Item yang sudah ada di carousel tidak muncul lagi di "Latest".
+  * **AC 9.5 (Auto-scroll):** Carousel maju tiap 4 detik dan kembali ke item pertama setelah yang terakhir; geser manual menjeda dan timer mulai ulang; tidak berjalan saat aplikasi di latar belakang.
   * **AC 9.4 (Few items):** Kurang dari 5 headline tetap tampil tanpa crash; bagian "Latest" disembunyikan.
 
 ---

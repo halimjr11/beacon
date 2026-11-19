@@ -29,6 +29,7 @@ import com.halimjr11.beacon.categories.GenresScreen
 import com.halimjr11.beacon.domain.model.NewsCategory
 import com.halimjr11.beacon.domain.model.NewsFeed
 import com.halimjr11.beacon.home.HomeScreen
+import com.halimjr11.beacon.sources.CategorySourcesScreen
 import com.halimjr11.beacon.sources.SourcesScreen
 
 /**
@@ -78,10 +79,19 @@ fun BeaconNavHost() {
                     HomeScreen(onArticleClick = { backStack.add(ArticleWebKey(it.url, it.title)) })
                 }
                 entry<GenresKey> {
-                    GenresScreen(onCategoryClick = { backStack.add(CategoryArticlesKey(it.apiValue)) })
+                    GenresScreen(onCategoryClick = { backStack.add(CategorySourcesKey(it.apiValue)) })
                 }
                 entry<SourcesKey> {
                     SourcesScreen(onSourceClick = { id, name -> backStack.add(SourceArticlesKey(id, name)) })
+                }
+                entry<CategorySourcesKey> { key ->
+                    val category = NewsCategory.entries.first { it.apiValue == key.category }
+                    CategorySourcesScreen(
+                        category = category,
+                        onBack = { backStack.removeLastOrNull() },
+                        onSourceClick = { id, name -> backStack.add(SourceArticlesKey(id, name)) },
+                        onTopHeadlinesClick = { backStack.add(CategoryArticlesKey(category.apiValue)) },
+                    )
                 }
                 entry<CategoryArticlesKey> { key ->
                     val category = NewsCategory.entries.first { it.apiValue == key.category }

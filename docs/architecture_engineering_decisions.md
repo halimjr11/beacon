@@ -19,7 +19,7 @@ Beacon/
 └── feature/
     ├── home/                       # HomeScreen (carousel highlight + Latest), HomeViewModel, homeModule
     ├── categories/                 # GenresScreen (7 genre, statis)
-    ├── sources/                    # SourcesScreen (chip kategori + search lokal), SourcesViewModel, sourcesModule
+    ├── sources/                    # SourcesScreen (tab: chip kategori + search lokal), CategorySourcesScreen (satu genre), SourcesViewModel(initialCategory), sourcesModule
     ├── articles/                   # ArticlesScreen untuk feed genre atau sumber, ArticlesViewModel (+search, debounce), articlesModule
     └── articleweb/                 # ArticleWebScreen (WebView), WebUrlPolicy (fungsi murni: validasi, upgrade https, izin skema), ArticleWebViewModel (opsional)
 ```
@@ -115,11 +115,14 @@ graph TD
 ```mermaid
 graph LR
     H["HomeKey (start)"] -->|artikel| W["ArticleWebKey(url, title)"]
-    G["GenresKey"] -->|genre| CA["CategoryArticlesKey(category)"]
-    S["SourcesKey"] -->|sumber| SA["SourceArticlesKey(sourceId, sourceName)"]
+    G["GenresKey"] -->|genre| CS["CategorySourcesKey(category)"]
+    CS -->|sumber| SA["SourceArticlesKey(sourceId, sourceName)"]
+    CS -->|"Top headlines"| CA["CategoryArticlesKey(category)"]
+    S["SourcesKey"] -->|sumber| SA
     CA -->|artikel| W
     SA -->|artikel| W
 ```
+* Alur US2 dipertahankan: Genres → `CategorySourcesScreen` (sumber satu genre, ViewModel diberi kategori lewat `parametersOf`) → artikel sumber. Chip "Top headlines" di layar itu membuka `CategoryArticlesKey`.
 * Tiga tab (`HomeKey`, `GenresKey`, `SourcesKey`) memakai `NavigationBar`. Memilih tab mengganti back stack menjadi `[Home, tab]`, sehingga Back dari tab mana pun kembali ke Home lalu keluar. State tab tidak dipertahankan saat berpindah tab (data tetap ada karena dibaca dari Room).
 * `NavDisplay` memakai dekorator `rememberSaveableStateHolderNavEntryDecorator` dan `rememberViewModelStoreNavEntryDecorator` supaya ViewModel terikat ke entri back stack.
 * Key `@Serializable` (`NavKey`) berada di `:app`; layar fitur menerima *callback* navigasi (tidak bergantung pada library navigasi). Bottom bar disembunyikan di layar artikel dan detail.
@@ -425,6 +428,7 @@ sequenceDiagram
   * **Pencarian artikel** tetap memanggil API (`q`) lewat `queryKey` sendiri; hasilnya ikut di-cache. Offline tanpa cache untuk query itu menampilkan error (TC-34).
   * **Retensi:** hapus artikel lebih tua dari 7 hari dan batasi total baris; skema cache boleh memakai `fallbackToDestructiveMigration` karena data dapat diambil ulang (`exportSchema = true`).
   * **Gambar:** disk cache Coil 3 menyediakan gambar offline tanpa kerja tambahan. Halaman `WebView` tetap membutuhkan internet (AC 4.2).
+  * **Paging config:** `initialLoadSize = 20` (bukan default 3 halaman, yang membuat pembukaan pertama memanggil API 3 kali) dan `prefetchDistance = 5`. Karena `RemoteMediator` mengambil satu halaman lebih awal saat data Room habis, pembukaan pertama = 2 request.
   * **Fase:** (1) Room + mediator sumber; (2) mediator artikel, banner offline, retensi.
 * **Consequences:** (+) hemat kuota, daftar tersedia offline, tidak ada layar kosong saat gagal, kunci item stabil lewat `rowId`. (−) `RemoteMediator` mudah salah (transaksi, kunci halaman, refresh yang membuat daftar melompat; dimitigasi TTL di `initialize()`); satu modul dan dua mapper tambahan; pengujian DAO butuh `androidTest` atau Robolectric (JUnit 4, bertentangan dengan platform JUnit 5 kecuali ditambah mesin vintage), sedangkan mediator dapat diuji dengan `paging-testing` bila DAO berada di balik interface dan diganti fake. Room 3 (3.0.3) hanya mendukung KSP dan sudah terverifikasi berjalan dengan AGP 9.5 dan KSP 2.3.x (`:core:database:kspDebugKotlin` lulus); skema diekspor ke `core/database/schemas/`.
 
@@ -447,7 +451,7 @@ sequenceDiagram
 ## 5. Build, Keamanan & Rilis
 * **Toolchain:** AGP 9.x tanpa plugin `org.jetbrains.kotlin.android` (Kotlin sudah built-in), Kotlin 2.4.x, JDK 17, Gradle version catalog + plugin konvensi `build-logic` (ADR-014). KSP hanya diterapkan di `:core:database` (Room); Koin tetap tanpa KSP (ADR-001).
 * **R8:** aktif pada `release` dengan `-obfuscationdictionary`, `-repackageclasses ''`, dan `consumer-rules.pro` untuk DTO. Setelah build, periksa `mapping.txt` memastikan class sendiri benar-benar teracak.
-* **Network security config:** `cleartextTrafficPermitted="false"`; satu-satunya pengecualian adalah `network_security_config.xml` di source set `debug` yang mengizinkan cleartext hanya ke `10.0.2.2` (server tiruan QA). Release tidak memiliki pengecualian.
+* **Network security config:** `cleartextTrafficPermitted="false"`; satu-satunya pengecualian adalah `network_security_config.xml` di source set `debug` yang mengizinkan cleartext hanya ke `10.0.2.2`, `localhost`, dan `127.0.0.1` (server tiruan QA, langsung atau lewat `adb reverse`). Release tidak memiliki pengecualian.
 * **Base URL uji:** `NEWS_API_BASE_URL` opsional di `local.properties` → `BuildConfig` (default `https://newsapi.org/v2/`; hanya dibaca di build debug). Dipakai untuk mengarahkan QA manual ke MockWebServer/server tiruan (lihat Test Plan §1) agar kasus kuota habis, sumber hilang, kosong, dan field null bisa dipicu.
 * **Catatan paket NewsAPI:** paket Developer hanya untuk dev/testing; rilis publik membutuhkan paket berbayar.
 

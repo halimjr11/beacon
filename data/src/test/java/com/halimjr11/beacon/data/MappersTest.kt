@@ -9,6 +9,11 @@ import com.halimjr11.beacon.network.dto.SourceDto
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.Arguments.argumentSet
+import org.junit.jupiter.params.provider.MethodSource
+import java.util.stream.Stream
 
 class MappersTest {
     @Test
@@ -41,13 +46,10 @@ class MappersTest {
         assertEquals("", entity.sourceName)
     }
 
-    @Test
-    fun `article without url, blank title or removed title is dropped`() {
-        assertNull(ArticleDto(title = "T", url = null).toEntity("s", ""))
-        assertNull(ArticleDto(title = "T", url = " ").toEntity("s", ""))
-        assertNull(ArticleDto(title = "", url = "https://a").toEntity("s", ""))
-        assertNull(ArticleDto(title = null, url = "https://a").toEntity("s", ""))
-        assertNull(ArticleDto(title = "[Removed]", url = "https://a").toEntity("s", ""))
+    @ParameterizedTest
+    @MethodSource("unusableArticles")
+    fun `unusable articles are dropped (AC 3_7)`(dto: ArticleDto) {
+        assertNull(dto.toEntity("s", ""))
     }
 
     @Test
@@ -58,5 +60,16 @@ class MappersTest {
         ).toDomain()
         assertEquals("https://a", domain.id)
         assertEquals("24 Jul 2026", domain.publishedAt)
+    }
+
+    companion object {
+        @JvmStatic
+        fun unusableArticles(): Stream<Arguments> = Stream.of(
+            argumentSet("no url", ArticleDto(title = "T", url = null)),
+            argumentSet("blank url", ArticleDto(title = "T", url = " ")),
+            argumentSet("empty title", ArticleDto(title = "", url = "https://a")),
+            argumentSet("null title", ArticleDto(title = null, url = "https://a")),
+            argumentSet("removed title", ArticleDto(title = "[Removed]", url = "https://a")),
+        )
     }
 }

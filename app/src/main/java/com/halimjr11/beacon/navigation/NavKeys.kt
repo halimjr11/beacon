@@ -8,7 +8,10 @@ import kotlinx.serialization.Serializable
 @Serializable data object GenresKey : NavKey
 @Serializable data object SourcesKey : NavKey
 
-/** Articles of one genre (`category` is the API value). */
+/** Sources of one genre (`category` is the API value): Genres -> Sources -> Articles. */
+@Serializable data class CategorySourcesKey(val category: String) : NavKey
+
+/** Top headlines of one genre (`category` is the API value). */
 @Serializable data class CategoryArticlesKey(val category: String) : NavKey
 
 /** Articles of one source. */

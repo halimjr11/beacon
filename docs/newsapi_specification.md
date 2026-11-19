@@ -2,6 +2,21 @@
 
 > Sumber: dokumentasi resmi [newsapi.org](https://newsapi.org/docs). Hal yang **tidak** tertulis di dokumentasi ditandai *(belum terverifikasi)* dan harus diuji dengan panggilan nyata sebelum dianggap final.
 
+## 0. Hasil Verifikasi Panggilan Nyata (2026-11-18, paket Developer)
+| Hal | Hasil |
+|---|---|
+| Urutan artikel | **Terbaru dulu** (`publishedAt` menurun), bertentangan dengan dokumentasi ("earliest first"). Tidak perlu diurutkan di klien. |
+| Ukuran halaman | `pageSize=20` bisa mengembalikan **kurang dari 20** (mis. 18 dan 11 dari `totalResults` 31): server menyaring item. Jangan menganggap halaman < `pageSize` sebagai halaman terakhir. |
+| Melewati `totalResults` | `page=3` (di atas 31) → **200** dengan `articles: []`, bukan error. `maximumResultsReached` belum terlihat. |
+| `sources` + `category`/`country` | **400** `parametersIncompatible` ("You cannot mix the sources parameter with the country or category parameters."). |
+| Header kuota | Tidak ada `X-RateLimit-*`; kuota hanya bisa dilihat di dashboard. |
+| Keterlambatan | Artikel berumur ± 24 jam (sesuai paket Developer). |
+| `publishedAt` | Bisa berisi milidetik (`...T14:50:35.039Z`); parser 10 karakter pertama aman. |
+| Sumber | `sources?category=general&language=en` → 40 sumber dalam satu respons. |
+| Gambar | `urlToImage` sering `null` (placeholder dipakai). |
+
+---
+
 ## 1. Base Configuration & Authentication
 * **Base URL:** `https://newsapi.org/v2/`
 * **Authentication (header via `ApiKeyInterceptor`):**
@@ -99,7 +114,7 @@
   * `sourceName` = `source.name`; `author`, `description`, `content` `null` → `""`; `urlToImage` `null`/kosong → `""` (UI memakai placeholder).
   * `publishedAt` (ISO-8601 UTC) → `dd MMM yyyy` (hanya 10 karakter pertama, tanpa pergeseran zona waktu); tidak valid → string asli.
   * Kunci item di daftar Compose **tidak boleh** memakai `url` saja karena bisa duplikat antarhalaman; pakai `url` + indeks atau tanpa key.
-* **Urutan hasil:** dokumentasi menyebut *"earliest first"*, yang janggal untuk berita utama. **Verifikasi dengan panggilan nyata**; bila terbalik, urutkan di sisi klien per halaman (terbaru dulu, sesuai PRD AC 3.1).
+* **Urutan hasil:** dokumentasi menyebut *"earliest first"*, yang janggal untuk berita utama. **Sudah diverifikasi: terbaru dulu** (lihat §0).
 
 ---
 
@@ -127,6 +142,7 @@
 | `sourcesTooMany` | Terlalu banyak sumber | `BadRequest` | Pesan umum + Retry |
 | `parameterInvalid` | Parameter tidak didukung | `BadRequest` | Pesan umum + Retry |
 | `parametersMissing` | Parameter wajib hilang | `BadRequest` | Pesan umum + Retry |
+| `parametersIncompatible` *(terverifikasi)* | `sources` digabung `country`/`category` | `BadRequest` | Pesan umum + Retry |
 | `unexpectedError` | Kesalahan server | `Server` | Retry |
 | `maximumResultsReached` *(belum terverifikasi)* | Melewati batas hasil paket | `EndOfResults` (akhir daftar; mediator mengubahnya jadi `endOfPaginationReached`) | Hentikan paging |
 | tidak dikenal | – | `Unknown` | Pesan umum + Retry |

@@ -18,7 +18,7 @@ object ErrorParser {
             "apiKeyMissing", "apiKeyInvalid", "apiKeyDisabled" -> NewsError.InvalidApiKey
             "apiKeyExhausted", "rateLimited" -> NewsError.RateLimited
             "sourceDoesNotExist" -> NewsError.SourceNotFound
-            "sourcesTooMany", "parameterInvalid", "parametersMissing" ->
+            "sourcesTooMany", "parameterInvalid", "parametersMissing", "parametersIncompatible" ->
                 NewsError.BadRequest(dto.code)
             "unexpectedError" -> NewsError.Server
             "maximumResultsReached" -> NewsError.EndOfResults
