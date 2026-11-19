@@ -105,10 +105,15 @@ graph TD
     F_WEB -.->|HTTPS| WEB
 ```
 
-### D. Strategi Koin Multi-Module
-* **Desentralisasi:** `networkModule`, `dataModule`, `domainModule` (di `:domain`), `sourcesModule`, `articlesModule` (dan `articleWebModule` bila ada ViewModel).
-* **Parameter runtime:** `viewModel { params -> SourcesViewModel(category = params.get(), getSources = get()) }` dipanggil dengan `parametersOf(...)`; kunci ViewModel unik per kategori/sumber (`key = "sources_$category"`).
-* **Verifikasi:** `KoinModulesTest` di `:app` menggabungkan seluruh modul (`includes(...)`) dan menjalankan `verify(extraTypes = listOf(Int::class, String::class))`.
+### D. Strategi Koin Multi-Module (Koin Annotations + KSP)
+* **Satu `@Module` per modul Gradle**, ditulis sebagai class dan di-generate menjadi `org.koin.core.module.Module` oleh KSP (`CommonModule`, `NetworkModule`, `DatabaseModule`, `DomainModule`, `DataModule`, `HomeModule`, `SourcesModule`, `ArticlesModule`). `:app` hanya mendaftarkannya di `appModules` (`CommonModule().module`, dst.).
+* **Dua cara mendefinisikan:**
+  * `@Module class X { @Single fun ... }`: untuk objek yang dibangun dengan kode (OkHttp, Retrofit, Room, DAO, `Clock`, `DispatcherProvider`).
+  * `@Single` / `@Factory` / `@KoinViewModel` langsung pada class, ditemukan oleh `@ComponentScan` pada `@Module` di paket yang sama (repository, use case, `CacheRetention`, semua ViewModel). Binding ke interface lewat `@Single(binds = [NewsRepository::class])`.
+* **Parameter runtime:** `@InjectedParam` pada konstruktor ViewModel; layar memanggil `koinViewModel(key = ..., parameters = { parametersOf(feed) })`. `SourcesViewModel` memakai `@InjectedParam NewsCategory?` (null = General, untuk tab Sources).
+* **Penegakan:** `startKoin` memakai `allowOverride(false)` (dua modul yang mendefinisikan tipe yang sama gagal saat start, bukan menimpa diam-diam) dan logger Koin hanya di build debug (`Level.ERROR`; release `NONE`).
+* **Verifikasi:** `KoinModulesTest` di `:app` (1) `verify(extraTypes = listOf(NewsFeed::class, NewsCategory::class))` atas gabungan modul dan (2) memuat modul dengan `allowOverride(false)` dan memeriksa jumlah modul.
+* **Plugin build:** `beacon.android.koin` (KSP + `koin-annotations` + `koin-ksp-compiler`), sudah termasuk di `beacon.android.feature`; modul non-fitur menambahkannya sendiri.
 
 ### E. Navigasi (Navigation 3)
 
@@ -362,10 +367,10 @@ sequenceDiagram
 
 ## 4. Architecture Decision Records (ADR)
 
-### ADR-001: Koin 4.2.2 dengan Constructor DSL
-* **Context:** Proyek membutuhkan DI ringan lintas modul, mendukung `ViewModel` dengan parameter runtime.
-* **Decision:** Koin (`singleOf`, `factoryOf`, `viewModel { params -> }`) terdesentralisasi per modul; `domainModule` berada di `:domain`.
-* **Consequences:** (+) tanpa KSP/KAPT, build cepat. (−) resolusi saat runtime. *(Mitigasi: `KoinModulesTest` dengan `verify()`.)*
+### ADR-001: Koin 4.2.2 dengan Koin Annotations (KSP)
+* **Context:** Proyek membutuhkan DI ringan lintas modul, mendukung `ViewModel` dengan parameter runtime. Awalnya dipilih Constructor DSL tanpa KSP; dengan 8 modul DI, daftar `module { }` manual dan `single { Foo(get(), get(), get(), ...) }` rawan salah urutan dan sulit dirawat.
+* **Decision:** Koin 4.2.2 (runtime) + Koin Annotations 2.3.1 dengan KSP (`@Module`, `@Single`, `@Factory`, `@KoinViewModel`, `@InjectedParam`, `@ComponentScan`), terdesentralisasi satu `@Module` per modul Gradle (bagian §1.D). Menggantikan keputusan awal "tanpa KSP".
+* **Consequences:** (+) definisi berada di samping class-nya, tanpa daftar `get()` manual; parameter konstruktor diselesaikan otomatis. (−) KSP berjalan di 8 modul (build sedikit lebih lama); `koin-ksp-compiler` 2.3.1 dikompilasi terhadap koin-core 4.1 (kompatibel dengan runtime 4.2.2); resolusi tetap saat runtime. *(Mitigasi: `KoinModulesTest` dengan `verify()` dan `allowOverride(false)`.)*
 
 ### ADR-002: Paging 3 untuk Sumber dan Artikel
 * **Context:** US6 mewajibkan *endless scrolling* di sumber dan artikel, lengkap dengan kasus error.
@@ -449,7 +454,7 @@ sequenceDiagram
 ---
 
 ## 5. Build, Keamanan & Rilis
-* **Toolchain:** AGP 9.x tanpa plugin `org.jetbrains.kotlin.android` (Kotlin sudah built-in), Kotlin 2.4.x, JDK 17, Gradle version catalog + plugin konvensi `build-logic` (ADR-014). KSP hanya diterapkan di `:core:database` (Room); Koin tetap tanpa KSP (ADR-001).
+* **Toolchain:** AGP 9.x tanpa plugin `org.jetbrains.kotlin.android` (Kotlin sudah built-in), Kotlin 2.4.x, JDK 17, Gradle version catalog + plugin konvensi `build-logic` (ADR-014). KSP diterapkan di `:core:database` (Room 3) dan di modul yang mendeklarasikan DI (Koin Annotations, ADR-001).
 * **R8:** aktif pada `release` dengan `-obfuscationdictionary`, `-repackageclasses ''`, dan `consumer-rules.pro` untuk DTO. Setelah build, periksa `mapping.txt` memastikan class sendiri benar-benar teracak.
 * **Network security config:** `cleartextTrafficPermitted="false"`; satu-satunya pengecualian adalah `network_security_config.xml` di source set `debug` yang mengizinkan cleartext hanya ke `10.0.2.2`, `localhost`, dan `127.0.0.1` (server tiruan QA, langsung atau lewat `adb reverse`). Release tidak memiliki pengecualian.
 * **Base URL uji:** `NEWS_API_BASE_URL` opsional di `local.properties` → `BuildConfig` (default `https://newsapi.org/v2/`; hanya dibaca di build debug). Dipakai untuk mengarahkan QA manual ke MockWebServer/server tiruan (lihat Test Plan §1) agar kasus kuota habis, sumber hilang, kosong, dan field null bisa dipicu.
