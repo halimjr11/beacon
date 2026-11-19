@@ -1,5 +1,6 @@
 plugins {
     id("beacon.android.library")
+    id("beacon.android.koin")
 }
 
 dependencies {

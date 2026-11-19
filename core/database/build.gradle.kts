@@ -1,6 +1,7 @@
 // Room 3 + KSP come from the convention plugin (schemas exported to ./schemas).
 plugins {
     id("beacon.android.room")
+    id("beacon.android.koin")
 }
 
 dependencies {

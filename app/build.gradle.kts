@@ -35,6 +35,7 @@ dependencies {
 
     api(libs.bundles.koin.compose)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.bundles.navigation3)
     implementation(libs.kotlinx.serialization.json)

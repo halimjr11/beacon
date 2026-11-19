@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     id("beacon.android.library")
+    id("beacon.android.koin")
 }
 
 val localProperties = Properties().apply {
