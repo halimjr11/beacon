@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto Backup and device-to-device transfer for Android 12 and higher (android:dataExtractionRules). -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="beacon.db" />
+        <exclude domain="database" path="beacon.db-wal" />
+        <exclude domain="database" path="beacon.db-shm" />
+        <exclude domain="cache" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="beacon.db" />
+        <exclude domain="database" path="beacon.db-wal" />
+        <exclude domain="database" path="beacon.db-shm" />
+        <exclude domain="cache" />
+    </device-transfer>
+</data-extraction-rules>

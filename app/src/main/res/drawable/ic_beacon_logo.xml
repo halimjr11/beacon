@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Beacon logo: a lighthouse with two light beams. 108dp canvas, artwork inside the central 66dp
+     so it survives adaptive-icon masks and the splash circle. Used by the splash screen and the
+     launcher icon (foreground and monochrome). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- light beams -->
+    <path
+        android:fillColor="#FBBF24"
+        android:fillAlpha="0.75"
+        android:pathData="M49,41 L27,33 L27,49 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:fillAlpha="0.75"
+        android:pathData="M59,41 L81,33 L81,49 Z" />
+    <!-- roof -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,38 L54,29 L62,38 Z" />
+    <!-- lamp room -->
+    <path
+        android:fillColor="#D97706"
+        android:pathData="M49,38 L59,38 L59,45 L49,45 Z" />
+    <!-- tower -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M49.5,45 L58.5,45 L62,78 L46,78 Z" />
+    <!-- tower stripe -->
+    <path
+        android:fillColor="#D97706"
+        android:pathData="M48.9,57 L59.1,57 L59.5,62 L48.5,62 Z" />
+    <!-- base -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M43,78 L65,78 L65,82 L43,82 Z" />
+</vector>

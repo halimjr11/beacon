@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto Backup for Android 11 and lower (android:fullBackupContent).
+     Everything the app stores is a re-fetchable cache, so nothing is backed up except
+     what future user settings would add under "sharedpref" or "file". -->
+<full-backup-content>
+    <!-- Room cache (articles, sources, remote keys): refilled from the API, tied to the schema. -->
+    <exclude domain="database" path="beacon.db" />
+    <exclude domain="database" path="beacon.db-wal" />
+    <exclude domain="database" path="beacon.db-shm" />
+    <!-- Coil image cache and any other cache directory. -->
+    <exclude domain="cache" />
+    <exclude domain="no_backup" />
+</full-backup-content>
