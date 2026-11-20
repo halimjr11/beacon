@@ -43,7 +43,7 @@ import org.koin.core.parameter.parametersOf
 fun SourcesScreen(
     onSourceClick: (id: String, name: String) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SourcesViewModel = koinViewModel(),
+    viewModel: SourcesViewModel = koinViewModel(parameters = { parametersOf(NewsCategory.General) }),
 ) {
     val category by viewModel.category.collectAsState()
     val query by viewModel.query.collectAsState()

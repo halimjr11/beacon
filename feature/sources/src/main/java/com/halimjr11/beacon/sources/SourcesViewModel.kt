@@ -18,14 +18,16 @@ import org.koin.core.annotation.InjectedParam
 
 /** Category chip and search text live here so they survive rotation (AC 5.3). Search is local (Room LIKE), so no debounce. */
 @OptIn(ExperimentalCoroutinesApi::class)
-/** The Sources tab passes no parameter (General); a genre screen passes `parametersOf(category)`. */
+/** Koin ignores @InjectedParam on a defaulted parameter, so the category is required; the tab passes General. */
 @KoinViewModel
 class SourcesViewModel(
     getSources: GetSourcesUseCase,
     @InjectedParam
-    initialCategory: NewsCategory? = null,
+    initialCategory: NewsCategory,
 ) : ViewModel() {
-    private val _category = MutableStateFlow(initialCategory ?: NewsCategory.General)
+    constructor(getSources: GetSourcesUseCase) : this(getSources, NewsCategory.General)
+
+    private val _category = MutableStateFlow(initialCategory)
     private val _query = MutableStateFlow("")
 
     val category: StateFlow<NewsCategory> = _category

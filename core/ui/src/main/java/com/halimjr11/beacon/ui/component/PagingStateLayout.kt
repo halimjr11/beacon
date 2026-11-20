@@ -14,6 +14,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.halimjr11.beacon.common.toNewsError
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val EMPTY_CONFIRM_MS = 400L
 
@@ -36,7 +37,7 @@ fun <T : Any> PagingStateLayout(
     // of "No headlines found").
     var emptyConfirmed by remember { mutableStateOf(false) }
     LaunchedEffect(emptyAndIdle) {
-        if (emptyAndIdle) { delay(EMPTY_CONFIRM_MS); emptyConfirmed = true } else emptyConfirmed = false
+        if (emptyAndIdle) { delay(EMPTY_CONFIRM_MS.milliseconds); emptyConfirmed = true } else emptyConfirmed = false
     }
     when {
         emptyAndIdle && !emptyConfirmed -> FullScreenLoading(modifier)
@@ -45,7 +46,7 @@ fun <T : Any> PagingStateLayout(
             FullScreenError(refresh.error.toNewsError(), onRetry = { items.retry() }, modifier = modifier, onBack = onBack)
         items.itemCount == 0 -> EmptyState(emptyText, modifier)
         else -> Column(modifier.fillMaxSize()) {
-            if (refresh is LoadState.Error) CacheBanner(refresh.error.toNewsError())
+            if (refresh is LoadState.Error) CacheBanner(refresh.error.toNewsError(), onRetry = { items.retry() })
             Box(Modifier.weight(1f)) { content() }
         }
     }
