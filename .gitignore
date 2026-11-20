@@ -13,6 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+/docs/mock
 
 # IDE / OS / tooling
 /.idea/
